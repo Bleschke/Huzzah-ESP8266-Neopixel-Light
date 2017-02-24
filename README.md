@@ -26,13 +26,11 @@ Installation instructions can be found at:
 
 The following libraries are required for this project:
     
-  * Arduino Framework (core library)
+  * [Arduino Framework (core library)](https://github.com/esp8266/Arduino)
   * Adafruit IO Arduino 
   * Adafruit MQTT 
-  * NeoPixelBus
-  * OLED
-    * Adafruit GFX Library
-    * Adafruit SSD1306 Library
+  * [NeoPixelBus](https://github.com/Makuna/NeoPixelBus)
+  * [JSON Streaming Parser](https://github.com/squix78/json-streaming-parser)
         
 ## **Uploading**
 
