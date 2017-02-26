@@ -27,9 +27,10 @@ Installation instructions can be found at:
 The following libraries are required for this project:
     
   * [Arduino Framework (core library)](https://github.com/esp8266/Arduino)
-  * Adafruit IO Arduino 
-  * Adafruit MQTT 
-  * [NeoPixelBus](https://github.com/Makuna/NeoPixelBus)
+  * ArduinoOTA
+  * ArduinoJson
+  * Adafruit_Neopixel
+  * ESP8266WiFi
   * [JSON Streaming Parser](https://github.com/squix78/json-streaming-parser)
         
 ## **Uploading**
@@ -79,5 +80,5 @@ To upload the main.cpp code to the ESP8266, enter the following into a terminal 
 
         
 ### **Recognition and Credit**
-I would like to recognize and give credit to [cjntaylor](https://github.com/cjntaylor/) for some of the code, ideas, and concepts that were used in the maccdc2016 repository. 
+I would like to recognize [cjntaylor](https://github.com/cjntaylor/) for some inspiration and ideas.
 
