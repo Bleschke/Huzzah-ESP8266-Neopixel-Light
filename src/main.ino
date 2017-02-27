@@ -2,11 +2,12 @@
  * Brian Leschke
  * February 26, 2017
  * Adafruit Huzzah ESP 8266 Neopixel Light
- * Version 1.0
+ * Version 1.1
  * 
  * -- Changelog: -- 
  * 
- * 2/26/17 - Initial Release without weather events and holidays
+ * 2/26/17 - Initial Release
+ * 2/26/17 - Weather Alerts implemented
  * 
  * 
 */
@@ -28,21 +29,41 @@
 // -------------------- CONFIGURATION --------------------
 
 // ** mDNS and OTA Constants **
-#define HOSTNAME "ESP8266-OTA-"            // Hostename. The setup function adds the Chip ID at the end.
-#define PIN            0                   // Pin used for Neopixel communication
-#define NUMPIXELS      1                   // Number of Neopixels connected to the Huzzah ESP8266
+#define HOSTNAME "ESP8266-OTA-"     // Hostename. The setup function adds the Chip ID at the end.
+#define PIN            0            // Pin used for Neopixel communication
+#define NUMPIXELS      1            // Number of Neopixels connected to Arduino
 
-// ** Default WiFi connection information **
+
+// ** Default WiFi connection Information **
 const char* ap_default_ssid = "esp8266";   // Default SSID.
 const char* ap_default_psk  = "esp8266";   // Default PSK.
 
+
+// ** Wunderground Information **
+String responseString;
+boolean startCapture;
+
+const char   WxServer[]        = "api.wunderground.com"; // name address for Weather Underground (using DNS)
+const String myKey             = "API-KEY HERE";         //See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
+const String myWxAlertFeatures = "alerts";               // Do Not Change. See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
+const String myWxFeatures      = "conditions";           // Do Not Change. See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
+const String myState           = "ABBREVIATED STATE";    //See: http://www.wunderground.com/weather/api/d/docs?d=resources/country-to-iso-matching
+const String myCity            = "CITY";                 //See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
+
+long wxAlertCheckInterval  = 900000; // 15min default. Time (milliseconds) until next weather alert check
+unsigned long previousWxAlertMillis = 0;
+// long wxCheckInterval  = 900000; // 15min default. Time (milliseconds) until next weather check
+// unsigned long previousWxMillis = 0;
+
+
 // ** FIRE-EMS INFORMATION **
 char SERVER_NAME[]    = "WEB ADDRESS HERE"; // Address of the webserver
-int SERVER_PORT             = PORT NUMBER HERE;       // webserver port
+int SERVER_PORT       = PORT NUMBER HERE;       // webserver port
 
 char Str[11];
-int prevNum  = 0; //Number of previous emails before check
-int num      = 0; //Number of emails after check
+int prevNum           = 0; //Number of previous emails before check
+int num               = 0; //Number of emails after check
+
 
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
@@ -135,8 +156,8 @@ void setup()
   pixels.setPixelColor(0, pixels.Color(0,0,0)); // OFF
   pixels.show(); // This sends the updated pixel color to the hardware.
   
-  String station_ssid = "";
-  String station_psk = "";
+  String station_ssid = ""; // Do Not Change
+  String station_psk = "";  // Do Not Change
 
   Serial.begin(115200);
   pixels.begin(); // This initializes the NeoPixel library.
@@ -325,6 +346,168 @@ void FireEmsCheck() {
   delay(2000);
 }
 
+void WeatherAlerts() {
+  // if you get a connection, report back via serial:
+  WiFiClient client;
+  if (client.connect(WxServer, 80))
+  {
+    Serial.println("Connected to Wunderground!");
+    
+    String html_cmd1 = "GET /api/" + myKey + "/" + myWxAlertFeatures + "/q/" + myState + "/" + myCity + ".json HTTP/1.1";
+    String html_cmd2 = "Host: " + (String)WxServer;
+    String html_cmd3 = "Connection: close";
+    
+    //Uncomment this if necessary
+    //Serial.println("Sending commands:");
+    //Serial.println(" " + html_cmd1);
+    //Serial.println(" " + html_cmd2);
+    //Serial.println(" " + html_cmd3);
+    //Serial.println();
+    
+    // Make a HTTP request:
+    client.println(html_cmd1);
+    client.println(html_cmd2);
+    client.println(html_cmd3);
+    client.println();
+    
+    responseString = "";
+    startCapture = false;   
+  } 
+  else
+  {
+    // if you didn't get a connection to the server:
+    Serial.println("Connection to Wunderground failed!");
+  }
+
+  // if there are incoming bytes available 
+  // from the server, read them and buffer:
+  if (client.available())
+  {
+    char c = client.read();
+    if(c == '{')
+      startCapture=true;
+    
+    if(startCapture)
+      responseString += c;
+  }
+
+  // if the server's disconnected, stop the client:
+  if (!client.connected()) {    
+    Serial.println("Received " + (String)responseString.length() + " bytes");
+    Serial.println("Disconnecting.");
+    client.stop();
+    client.flush();
+    Serial.println();
+    
+    Serial.print("Alerts: ");
+    if (responseString == "TOR") // Tornado Warning
+    {
+      Serial.println(getValuesFromKey(responseString, "alerts"));
+      for(int x = 0; x < 200; x++)  // Neopixel LED blinks 200 times.
+      {
+        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
+        pixels.setPixelColor(0, pixels.Color(255,0,0));   // RED
+        pixels.show(); // This sends the updated pixel color to the hardware.
+        delay(250);
+        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+        pixels.setPixelColor(0, pixels.Color(255,165,0)); // ORANGE
+        pixels.show(); // This sends the updated pixel color to the hardware.
+        delay(250);
+      } 
+    }
+    else if (responseString == "TOW") // Tornado Watch
+    {
+      Serial.println(getValuesFromKey(responseString, "alerts"));
+      for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
+      {
+        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
+        pixels.setPixelColor(0, pixels.Color(255,0,0));   // RED
+        pixels.show(); // This sends the updated pixel color to the hardware.
+        delay(250);
+        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+        pixels.setPixelColor(0, pixels.Color(255,255,0)); // YELLOW
+        pixels.show(); // This sends the updated pixel color to the hardware.
+        delay(250);
+      } 
+    }
+    else if (responseString == "WIN") // Winter Weather
+    {
+      Serial.println(getValuesFromKey(responseString, "alerts"));
+      for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
+      {
+        pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF  
+        pixels.setPixelColor(0, pixels.Color(255,153,171)); // Pink
+        pixels.show(); // This sends the updated pixel color to the hardware.
+        delay(250);
+        pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF
+        pixels.setPixelColor(0, pixels.Color(0,249,255));   // Light Blue
+        pixels.show(); // This sends the updated pixel color to the hardware.
+        delay(250);
+      } 
+    }
+    
+    pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
+    pixels.show(); // This sends the updated pixel color to the hardware.
+    Serial.println("No Reportable Weather Alerts");
+  }
+  
+}
+
+String getValuesFromKey(const String response, const String sKey)
+{ 
+  String sKey_ = sKey;
+  
+  sKey_ = "\"" + sKey + "\":";
+  
+  char key[sKey_.length()];
+  
+  sKey_.toCharArray(key, sizeof(key));
+  
+  int keySize = sizeof(key)-1;
+    
+  String result = "";  // String result = NULL;
+  
+  int n = response.length();
+  
+  for(int i=0; i < (n-keySize-1); i++)
+  {
+    char c[keySize];
+    
+    for(int k=0; k<keySize; k++)
+    {
+      c[k] = response.charAt(i+k);
+    }
+        
+    boolean isEqual = true;
+    
+    for(int k=0; k<keySize; k++)
+    {
+      if(!(c[k] == key[k]))
+      {
+        isEqual = false;
+        break;
+      }
+    }
+    
+    if(isEqual)
+    {     
+      int j= i + keySize + 1;
+      while(!(response.charAt(j) == ','))
+      {
+        result += response.charAt(j);        
+        j++;
+      }
+      
+      //Remove char '"'
+      result.replace("\"","");
+      break;
+    }
+  }
+  
+  return result;
+}
+
+
 // ---------- ESP 8266 FUNCTIONS - CAN BE REMOVED ----------
 
 void loop()
@@ -337,7 +520,45 @@ void loop()
 
   // ** FireEMS Alert Check **
   FireEmsCheck();
+
+  // ** Weather Alert Check **
+  unsigned long currentWxAlertMillis = millis();
   
+  if(currentWxAlertMillis - previousWxAlertMillis >= wxAlertCheckInterval) {
+    Serial.println("Checking for Weather Alerts");
+    WeatherAlerts();
+    previousWxAlertMillis = currentWxAlertMillis; //remember the time(millis)
+  }
+  else {
+    Serial.println("Bypassing Weather Alert Check. Less than 15 minutes since last check.");
+    Serial.println("Previous Millis: ");
+    Serial.println(previousWxAlertMillis);
+    Serial.println("Current Millis: ");
+    Serial.println(currentWxAlertMillis);
+    Serial.println("Subtracted Millis");
+    Serial.println(currentWxAlertMillis-previousWxAlertMillis);
+    Serial.println();
+  }
+
+/*  // ** Weather Check **
+  unsigned long currentWxMillis = millis();
+  
+  if(currentWxMillis - previousWxMillis >= wxCheckInterval) {
+    Serial.println("Checking for Weather Alerts");
+    WeatherAlerts();
+    previousWxMillis = currentWxMillis; //remember the time(millis)
+  }
+  else {
+    Serial.println("Bypassing Weather Check. Less than 15 minutes since last check.");
+    Serial.println("Previous Millis: ");
+    Serial.println(previousWxMillis);
+    Serial.println("Current Millis: ");
+    Serial.println(currentWxMillis);
+    Serial.println("Subtracted Millis");
+    Serial.println(currentWxMillis-previousWxMillis);
+    Serial.println();
+  }
+*/  
   
   // ---------- USER CODE GOES HERE ----------
   yield();
