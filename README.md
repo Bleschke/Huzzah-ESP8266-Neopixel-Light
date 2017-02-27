@@ -12,7 +12,7 @@ Currently Implemented:
 Future Implementations:
 * Lights change color per weather conditions (debatable)
 * Lights change color for Holidays
-* Hellscreiber transmission from 433 Mhz chip
+* Hellschreiber transmission from 433 Mhz chip
 
 ### **Prerequisities**
 
