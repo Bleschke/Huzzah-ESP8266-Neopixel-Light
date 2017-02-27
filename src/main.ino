@@ -7,9 +7,10 @@
  * 
  * -- Changelog: -- 
  * 
- * 2/26/17 - Initial Release - Fire/EMS Alerts implemented
- * 2/26/17 - Weather Alerts implemented
- * 2/27/17 - 
+ * 2/26/17 - Initial Release - Fire/EMS and Weather Alerts implemented
+ * 2/27/17 - Added NTP Client
+ *
+ *
  * 
 */
 
