@@ -1,6 +1,6 @@
 /* 
  * Brian Leschke
- * February 26, 2017
+ * February 27, 2017
  * Adafruit Huzzah ESP 8266 Neopixel Light
  * The ESP8266 will control a neopixel and change the color based on Weather events, Holidays, and Fire/EMS calls.
  * Version 1.1
@@ -431,6 +431,21 @@ void WeatherAlerts() {
         delay(250);
       } 
     }
+    else if (responseString == "WRN") // Severe Thunderstorm Warning
+    {
+      Serial.println(getValuesFromKey(responseString, "alerts"));
+      for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
+      {
+        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+        pixels.setPixelColor(0, pixels.Color(255,165,0)); // ORANGE
+        pixels.show(); // This sends the updated pixel color to the hardware.
+        delay(250);
+        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+        pixels.setPixelColor(0, pixels.Color(255,255,0)); // YELLOW
+        pixels.show(); // This sends the updated pixel color to the hardware.
+        delay(250);
+      } 
+    }    
     else if (responseString == "WIN") // Winter Weather
     {
       Serial.println(getValuesFromKey(responseString, "alerts"));
