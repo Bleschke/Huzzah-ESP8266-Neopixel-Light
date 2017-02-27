@@ -5,10 +5,14 @@
  * The ESP8266 will control a neopixel and change the color based on Weather events, Holidays, and Fire/EMS calls.
  * Version 1.1
  * 
+ *
+ * -- Credit and Recognition: --
+ * Morse Code Beacon Code by Mark VandeWettering (k6hx@arrl.net)
+ *
  * -- Changelog: -- 
  * 
  * 2/26/17 - Initial Release - Fire/EMS and Weather Alerts implemented
- * 2/27/17 - Added NTP Client and Hellschreiber
+ * 2/27/17 - Added NTP Client and Morse Code
  *
  *
  * 
@@ -38,6 +42,7 @@
 // Neopixel Setup
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
+
 // ** Default WiFi connection Information **
 const char* ap_default_ssid = "esp8266";   // Default SSID.
 const char* ap_default_psk  = "esp8266";   // Default PSK.
@@ -48,21 +53,21 @@ String responseString;
 boolean startCapture;
 
 const char   WxServer[]        = "api.wunderground.com"; // name address for Weather Underground (using DNS)
-const String myKey             = "API-KEY HERE";         //See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
+const String myKey             = "API-KEY";         //See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
 const String myWxAlertFeatures = "alerts";               // Do Not Change. See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
 const String myWxFeatures      = "conditions";           // Do Not Change. See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
-const String myState           = "ABBREVIATED STATE";    //See: http://www.wunderground.com/weather/api/d/docs?d=resources/country-to-iso-matching
+const String myState           = "ABBREV STATE";    //See: http://www.wunderground.com/weather/api/d/docs?d=resources/country-to-iso-matching
 const String myCity            = "CITY";                 //See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
 
-long wxAlertCheckInterval  = 900000; // 15min default. Time (milliseconds) until next weather alert check
+long wxAlertCheckInterval           = 900000; // 15min default. Time (milliseconds) until next weather alert check
 unsigned long previousWxAlertMillis = 0;
-// long wxCheckInterval  = 900000; // 15min default. Time (milliseconds) until next weather check
-// unsigned long previousWxMillis = 0;
+// long wxCheckInterval             = 900000; // 15min default. Time (milliseconds) until next weather check
+// unsigned long previousWxMillis   = 0;
 
 
 // ** FIRE-EMS INFORMATION **
-char SERVER_NAME[]    = "WEB ADDRESS HERE"; // Address of the webserver
-int SERVER_PORT       = PORT NUMBER HERE;       // webserver port
+char SERVER_NAME[]    = "SERVER ADDRESS"; // Address of the webserver
+int SERVER_PORT       = PORT HERE;       // webserver port
 
 char Str[11];
 int prevNum           = 0; //Number of previous emails before check
@@ -70,75 +75,79 @@ int num               = 0; //Number of emails after check
 
 
 // ** NTP SERVER INFORMATION **
+// const char* timeHost = "time-c.nist.gov";
+const char* timeHost    = "129.6.15.30";
+const int timePort      = 13;
+
+int ln = 0;
+String TimeDate = "";
+
+/*
 WiFiUDP ntpUDP;
 // You can specify the time server pool and the offset, (in seconds)
 // additionaly you can specify the update interval (in milliseconds).
 // NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 NTPClient timeClient(ntpUDP); // default 'time.nist.gov'
 
-// ** HELLSCHREIBER TRANSMISSION INFORMATION **
-#define NGLYPHS         (sizeof(glyphtab)/sizeof(glyphtab[0]))
-int radioPin = 2;
-char callsign[] = "CALLSIGN HERE"; // FCC Callsign
+*/
 
+// ** MORSE CODE TRANSMISSION INFORMATION **
+#define N_MORSE  (sizeof(morsetab)/sizeof(morsetab[0]))
 
-typedef struct glyph {
-    char ch ;
-    word col[7] ;
-} Glyph ;
- 
-Glyph glyphtab[] PROGMEM = {
-{' ', {0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000}},
-{'A', {0x07fc, 0x0e60, 0x0c60, 0x0e60, 0x07fc, 0x0000, 0x0000}},
-{'B', {0x0c0c, 0x0ffc, 0x0ccc, 0x0ccc, 0x0738, 0x0000, 0x0000}},
-{'C', {0x0ffc, 0x0c0c, 0x0c0c, 0x0c0c, 0x0c0c, 0x0000, 0x0000}},
-{'D', {0x0c0c, 0x0ffc, 0x0c0c, 0x0c0c, 0x07f8, 0x0000, 0x0000}},
-{'E', {0x0ffc, 0x0ccc, 0x0ccc, 0x0c0c, 0x0c0c, 0x0000, 0x0000}},
-{'F', {0x0ffc, 0x0cc0, 0x0cc0, 0x0c00, 0x0c00, 0x0000, 0x0000}},
-{'G', {0x0ffc, 0x0c0c, 0x0c0c, 0x0ccc, 0x0cfc, 0x0000, 0x0000}},
-{'H', {0x0ffc, 0x00c0, 0x00c0, 0x00c0, 0x0ffc, 0x0000, 0x0000}},
-{'I', {0x0ffc, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000}},
-{'J', {0x003c, 0x000c, 0x000c, 0x000c, 0x0ffc, 0x0000, 0x0000}},
-{'K', {0x0ffc, 0x00c0, 0x00e0, 0x0330, 0x0e1c, 0x0000, 0x0000}},
-{'L', {0x0ffc, 0x000c, 0x000c, 0x000c, 0x000c, 0x0000, 0x0000}},
-{'M', {0x0ffc, 0x0600, 0x0300, 0x0600, 0x0ffc, 0x0000, 0x0000}},
-{'N', {0x0ffc, 0x0700, 0x01c0, 0x0070, 0x0ffc, 0x0000, 0x0000}},
-{'O', {0x0ffc, 0x0c0c, 0x0c0c, 0x0c0c, 0x0ffc, 0x0000, 0x0000}},
-{'P', {0x0c0c, 0x0ffc, 0x0ccc, 0x0cc0, 0x0780, 0x0000, 0x0000}},
-{'Q', {0x0ffc, 0x0c0c, 0x0c3c, 0x0ffc, 0x000f, 0x0000, 0x0000}},
-{'R', {0x0ffc, 0x0cc0, 0x0cc0, 0x0cf0, 0x079c, 0x0000, 0x0000}},
-{'S', {0x078c, 0x0ccc, 0x0ccc, 0x0ccc, 0x0c78, 0x0000, 0x0000}},
-{'T', {0x0c00, 0x0c00, 0x0ffc, 0x0c00, 0x0c00, 0x0000, 0x0000}},
-{'U', {0x0ff8, 0x000c, 0x000c, 0x000c, 0x0ff8, 0x0000, 0x0000}},
-{'V', {0x0ffc, 0x0038, 0x00e0, 0x0380, 0x0e00, 0x0000, 0x0000}},
-{'W', {0x0ff8, 0x000c, 0x00f8, 0x000c, 0x0ff8, 0x0000, 0x0000}},
-{'X', {0x0e1c, 0x0330, 0x01e0, 0x0330, 0x0e1c, 0x0000, 0x0000}},
-{'Y', {0x0e00, 0x0380, 0x00fc, 0x0380, 0x0e00, 0x0000, 0x0000}},
-{'Z', {0x0c1c, 0x0c7c, 0x0ccc, 0x0f8c, 0x0e0c, 0x0000, 0x0000}},
-{'0', {0x07f8, 0x0c0c, 0x0c0c, 0x0c0c, 0x07f8, 0x0000, 0x0000}},
-{'1', {0x0300, 0x0600, 0x0ffc, 0x0000, 0x0000, 0x0000, 0x0000}},
-{'2', {0x061c, 0x0c3c, 0x0ccc, 0x078c, 0x000c, 0x0000, 0x0000}},
-{'3', {0x0006, 0x1806, 0x198c, 0x1f98, 0x00f0, 0x0000, 0x0000}},
-{'4', {0x1fe0, 0x0060, 0x0060, 0x0ffc, 0x0060, 0x0000, 0x0000}},
-{'5', {0x000c, 0x000c, 0x1f8c, 0x1998, 0x18f0, 0x0000, 0x0000}},
-{'6', {0x07fc, 0x0c66, 0x18c6, 0x00c6, 0x007c, 0x0000, 0x0000}},
-{'7', {0x181c, 0x1870, 0x19c0, 0x1f00, 0x1c00, 0x0000, 0x0000}},
-{'8', {0x0f3c, 0x19e6, 0x18c6, 0x19e6, 0x0f3c, 0x0000, 0x0000}},
-{'9', {0x0f80, 0x18c6, 0x18cc, 0x1818, 0x0ff0, 0x0000, 0x0000}},
-{'*', {0x018c, 0x0198, 0x0ff0, 0x0198, 0x018c, 0x0000, 0x0000}},
-{'.', {0x001c, 0x001c, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000}},
-{'?', {0x1800, 0x1800, 0x19ce, 0x1f00, 0x0000, 0x0000, 0x0000}},
-{'!', {0x1f9c, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000}},
-{'(', {0x01e0, 0x0738, 0x1c0e, 0x0000, 0x0000, 0x0000, 0x0000}},
-{')', {0x1c0e, 0x0738, 0x01e0, 0x0000, 0x0000, 0x0000, 0x0000}},
-{'#', {0x0330, 0x0ffc, 0x0330, 0x0ffc, 0x0330, 0x0000, 0x0000}},
-{'$', {0x078c, 0x0ccc, 0x1ffe, 0x0ccc, 0x0c78, 0x0000, 0x0000}},
-{'/', {0x001c, 0x0070, 0x01c0, 0x0700, 0x1c00, 0x0000, 0x0000}},
+#define SPEED  (12)
+#define DOTLEN  (1200/SPEED)
+#define DASHLEN  (3*(1200/SPEED))
+int LEDpin = 2 ;
+
+struct t_mtab { char c, pat; } ;
+
+struct t_mtab morsetab[] = {
+  {'.', 106},
+  {',', 115},
+  {'?', 76},
+  {'/', 41},
+  {'A', 6},
+  {'B', 17},
+  {'C', 21},
+  {'D', 9},
+  {'E', 2},
+  {'F', 20},
+  {'G', 11},
+  {'H', 16},
+  {'I', 4},
+  {'J', 30},
+  {'K', 13},
+  {'L', 18},
+  {'M', 7},
+  {'N', 5},
+  {'O', 15},
+  {'P', 22},
+  {'Q', 27},
+  {'R', 10},
+  {'S', 8},
+  {'T', 3},
+  {'U', 12},
+  {'V', 24},
+  {'W', 14},
+  {'X', 25},
+  {'Y', 29},
+  {'Z', 19},
+  {'1', 62},
+  {'2', 60},
+  {'3', 56},
+  {'4', 48},
+  {'5', 32},
+  {'6', 33},
+  {'7', 35},
+  {'8', 39},
+  {'9', 47},
+  {'0', 63}
 } ;
 
 
 // Uncomment the next line for verbose output over UART.
 #define SERIAL_VERBOSE
+
 
 
 // ---------- OTA CONFIGURATION - DO NOT MODIFY ----------
@@ -232,7 +241,7 @@ void setup()
 
   Serial.begin(115200);
   pixels.begin(); // This initializes the NeoPixel library.
-  pinMode(radioPin, OUTPUT) ; // Initialize Hellschreiber transmission output.
+  pinMode(LEDpin, OUTPUT) ; // Initialize Hellschreiber transmission output.
   
   delay(100);
 
@@ -306,7 +315,7 @@ void setup()
     delay(500);
   }
   Serial.println();
-  timeClient.begin(); // Start NTP client
+  //timeClient.begin(); // Start the time client
 
   // Check connection
   if(WiFi.status() == WL_CONNECTED)
@@ -351,7 +360,7 @@ void FireEmsCheck() {
   } 
   else {
     // if you didn't get a connection to the server:
-    Serial.println("connection failed");  //cannot connect to server
+    Serial.println("Fire/EMS email check: connection failed");  //cannot connect to server
   }
 
   // if there's data ready to be read:
@@ -449,7 +458,7 @@ void WeatherAlerts() {
   else
   {
     // if you didn't get a connection to the server:
-    Serial.println("Connection to Wunderground failed!");
+    Serial.println("Wunderground Weather Alerts: Connection failed.");
   }
 
   // if there are incoming bytes available 
@@ -595,40 +604,106 @@ String getValuesFromKey(const String response, const String sKey)
   return result;
 }
 
-void encodechar(int ch)
+void dash()
 {
-    int i, x, y, fch ;
-    word fbits ;
- 
-    /* It looks sloppy to continue searching even after you've
-     * found the letter you are looking for, but it makes the 
-     * timing more deterministic, which will make tuning the 
-     * exact timing a bit simpler.
-     */
-    for (i=0; i<NGLYPHS; i++) {
-        fch = pgm_read_byte(&glyphtab[i].ch) ;
-        if (fch == ch) {
-            for (x=0; x<7; x++) {
-                fbits = pgm_read_word(&(glyphtab[i].col[x])) ;
-                for (y=0; y<14; y++) {
-                    if (fbits & (1<<y))
-                        digitalWrite(radioPin, HIGH) ;
-                    else
-                        digitalWrite(radioPin, LOW) ;
-                         
-                    delayMicroseconds(4045L) ;
-                }
-            }
-        }
-    }
-}
- 
-void encode(char *ch)
-{
-    while (*ch != '\0') 
-        encodechar(*ch++) ;
+  digitalWrite(LEDpin, HIGH) ;
+  delay(DASHLEN);
+  digitalWrite(LEDpin, LOW) ;
+  delay(DOTLEN) ;
 }
 
+void dit()
+{
+  digitalWrite(LEDpin, HIGH) ;
+  delay(DOTLEN);
+  digitalWrite(LEDpin, LOW) ;
+  delay(DOTLEN);
+}
+
+void send(char c)
+{
+  int i ;
+  if (c == ' ') {
+    Serial.print(c) ;
+    delay(7*DOTLEN) ;
+    return ;
+  }
+  for (i=0; i<N_MORSE; i++) {
+    if (morsetab[i].c == c) {
+      unsigned char p = morsetab[i].pat ;
+      Serial.print(morsetab[i].c) ;
+
+      while (p != 1) {
+          if (p & 1)
+            dash() ;
+          else
+            dit() ;
+          p = p / 2 ;
+      }
+      delay(2*DOTLEN) ;
+      return ;
+    }
+  }
+  /* if we drop off the end, then we send a space */
+  Serial.print("?") ;
+}
+
+void sendmsg(char *str)
+{
+  while (*str)
+    send(*str++) ;
+  Serial.println("");
+}
+
+
+void getDateTime()
+{
+  Serial.print("connecting to ");
+  Serial.println(timeHost);
+
+  // Use WiFiClient class to create TCP connections
+  WiFiClient client;
+
+  if (!client.connect(timeHost, timePort)) {
+    Serial.println("NIST Timeservers: connection failed");
+    return;
+  }
+  
+  // This will send the request to the server
+  client.print("HEAD / HTTP/1.1\r\nAccept: */*\r\nUser-Agent: Mozilla/4.0 (compatible; ESP8266 NodeMcu Lua;)\r\n\r\n");
+
+  delay(100);
+
+  // Read all the lines of the reply from server and print them to Serial
+  // expected line is like : Date: Thu, 01 Jan 2015 22:00:14 GMT
+  char buffer[12];
+  String dateTime = "";
+
+  while(client.available())
+  {
+    String line = client.readStringUntil('\r');
+
+    if (line.indexOf("Date") != -1)
+    {
+      Serial.print("=====>");
+    } else
+    {
+      // Serial.print(line);
+      // date starts at pos 7
+      TimeDate = line.substring(7);
+      Serial.println(TimeDate);
+      // time starts at pos 14
+      TimeDate = line.substring(7, 15);
+      TimeDate.toCharArray(buffer, 10);
+      Serial.println("UTC Date:");
+      Serial.println(buffer);
+      //TimeDate = line.substring(16, 24);
+      //TimeDate.toCharArray(buffer, 10);
+      //Serial.println(buffer);
+
+    }
+  }
+}
 
 // ---------- ESP 8266 FUNCTIONS - SOME CAN BE REMOVED ----------
 
@@ -640,14 +715,15 @@ void loop()
 
   // ---------- USER CODE GOES HERE ----------
 
-  // ** Receive Time (NTP) **
-  timeClient.update();
-  Serial.println(timeClient.getFormattedTime());  //prints time in 'hh:mm:ss'
-  delay(1000);
+  // ** Transmit Morse Code **
+  sendmsg("CALLSIGN HERE"); // FCC callsign and Message
   
-  // ** Transmit HellSchreiber **
-  encode(callsign);
-  
+  // ** Receive Time (NTP)**
+  getDateTime();
+  //timeClient.update();
+  //Serial.println(timeClient.getFormattedTime()); //prints time in 'hh:mm:ss'
+  //delay(1000);
+
   // ** FireEMS Alert Check **
   FireEmsCheck();
 
@@ -693,4 +769,3 @@ void loop()
   // ---------- USER CODE GOES HERE ----------
   yield();
 }
-
