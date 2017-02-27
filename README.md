@@ -27,6 +27,7 @@ You will need:
 3. PlatformIO
 4. Operating system that supports PlatformIO
 5. FTDI cable (https://www.sparkfun.com/products/9717)
+6. Radio Trnsmitter (https://www.sparkfun.com/products/10534)
 
 ### **Usage**
 
