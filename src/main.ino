@@ -17,6 +17,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
+#include <NTPClient.h>
 #include <FS.h>
 #include <ArduinoOTA.h>
 #include <ArduinoJson.h>
@@ -33,7 +34,8 @@
 #define HOSTNAME "ESP8266-OTA-"     // Hostename. The setup function adds the Chip ID at the end.
 #define PIN            0            // Pin used for Neopixel communication
 #define NUMPIXELS      1            // Number of Neopixels connected to Arduino
-
+// Neopixel Setup
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
 // ** Default WiFi connection Information **
 const char* ap_default_ssid = "esp8266";   // Default SSID.
@@ -66,7 +68,13 @@ int prevNum           = 0; //Number of previous emails before check
 int num               = 0; //Number of emails after check
 
 
-Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+// ** NTP SERVER INFORMATION **
+WiFiUDP ntpUDP;
+// You can specify the time server pool and the offset, (in seconds)
+// additionaly you can specify the update interval (in milliseconds).
+// NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+NTPClient timeClient(ntpUDP); // default 'time.nist.gov'
+
 
 // Uncomment the next line for verbose output over UART.
 #define SERIAL_VERBOSE
@@ -235,6 +243,7 @@ void setup()
     delay(500);
   }
   Serial.println();
+  timeClient.begin(); // Start NTP client
 
   // Check connection
   if(WiFi.status() == WL_CONNECTED)
@@ -534,6 +543,12 @@ void loop()
 
   // ---------- USER CODE GOES HERE ----------
 
+  // ** Receive Time (NTP) **
+  
+  timeClient.update();
+  Serial.println(timeClient.getFormattedTime());
+  delay(1000);
+  
   // ** FireEMS Alert Check **
   FireEmsCheck();
 
