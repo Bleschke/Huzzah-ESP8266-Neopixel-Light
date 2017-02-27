@@ -82,5 +82,5 @@ To upload the main.cpp code to the ESP8266, enter the following into a terminal 
 
         
 ### **Recognition and Credit**
-I would like to recognize [cjntaylor](https://github.com/cjntaylor/) for some inspiration and ideas.
+I would like to recognize [cjntaylor](https://github.com/cjntaylor/) and other users/projects for some inspiration and ideas.
 
