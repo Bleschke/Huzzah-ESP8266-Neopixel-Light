@@ -6,7 +6,7 @@
  * 
  * -- Changelog: -- 
  * 
- * 2/26/17 - Initial Release
+ * 2/26/17 - Initial Release - Fire/EMS Alerts implemented
  * 2/26/17 - Weather Alerts implemented
  * 
  * 
@@ -508,7 +508,7 @@ String getValuesFromKey(const String response, const String sKey)
 }
 
 
-// ---------- ESP 8266 FUNCTIONS - CAN BE REMOVED ----------
+// ---------- ESP 8266 FUNCTIONS - SOME CAN BE REMOVED ----------
 
 void loop()
 {
