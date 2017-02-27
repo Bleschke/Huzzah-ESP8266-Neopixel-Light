@@ -545,7 +545,6 @@ void loop()
   // ---------- USER CODE GOES HERE ----------
 
   // ** Receive Time (NTP) **
-  
   timeClient.update();
   Serial.println(timeClient.getFormattedTime());
   delay(1000);
