@@ -12,11 +12,11 @@ Currently Implemented:
     * Tornado Watch
     * Severe Thunderstorm Warning
     * Winter Weather
+* Hellschreiber transmission from 433 Mhz chip
 
 Future Implementations:
 * Lights change color per weather conditions (debatable)
 * Lights change color for Holidays
-* Hellschreiber transmission from 433 Mhz chip
 
 ### **Prerequisities**
 
@@ -44,6 +44,7 @@ The following libraries are required for this project:
   * ArduinoJson
   * Adafruit_Neopixel
   * ESP8266WiFi
+  * NTPClient
   * [JSON Streaming Parser](https://github.com/squix78/json-streaming-parser)
         
 ## **Uploading**
