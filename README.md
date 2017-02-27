@@ -5,7 +5,7 @@ Brian Leschke 2017
 
 The ESP8266 will control a neopixel and change the color based on Weather events, Holidays, and Fire/EMS calls. 
 
-** As of 26 FEB 2017, only Fire/EMS calls have been implemented. Weather events and Holidays will be implemented in the near future.
+** As of 26 FEB 2017, Fire/EMS calls and Weather Alerts have been implemented. Holidays will be implemented in the future.
 
 ### **Prerequisities**
 
