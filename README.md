@@ -12,7 +12,7 @@ Currently Implemented:
     * Tornado Watch
     * Severe Thunderstorm Warning
     * Winter Weather
-* Hellschreiber transmission from 433 Mhz chip
+* Morse Code transmission from 433 Mhz chip
 
 Future Implementations:
 * Lights change color per weather conditions (debatable)
