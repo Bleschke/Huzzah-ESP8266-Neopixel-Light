@@ -8,6 +8,10 @@ The ESP8266 will control a neopixel and change the color based on Weather events
 Currently Implemented:
 * Fire/EMS Call Alerts
 * NOAA Weather Alerts (provided by wunderground)
+    * Tornado Warning
+    * Tornado Watch
+    * Severe Thunderstorm Warning
+    * Winter Weather
 
 Future Implementations:
 * Lights change color per weather conditions (debatable)
