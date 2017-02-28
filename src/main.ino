@@ -542,10 +542,11 @@ void WeatherAlerts() {
         delay(250);
       } 
     }
-    
-    pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
-    pixels.show(); // This sends the updated pixel color to the hardware.
-    Serial.println("No Reportable Weather Alerts");
+    else {
+      pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
+      pixels.show(); // This sends the updated pixel color to the hardware.
+      Serial.println("No Reportable Weather Alerts");
+    }
   }
   
 }
