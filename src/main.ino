@@ -415,8 +415,6 @@ void FireEmsCheck() {
     pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
     pixels.show(); // This sends the updated pixel color to the hardware.
   }
-  //pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
-  //pixels.show(); // This sends the updated pixel color to the hardware.
   delay(2000);
 }
 
@@ -491,7 +489,7 @@ WiFiClient client;
         pixels.show(); // This sends the updated pixel color to the hardware.
         delay(250);
         pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
-        pixels.setPixelColor(0, pixels.Color(255,165,0)); // ORANGE
+        pixels.setPixelColor(0, pixels.Color(255,95,0)); // ORANGE
         pixels.show(); // This sends the updated pixel color to the hardware.
         delay(250);
       } 
@@ -721,7 +719,7 @@ void timeDateEvents()
       }
       else if (stricmp ("10-11",buffer) == 0)
       {
-	Serial.println("Happy National Coming out Day!");
+	Serial.println("Happy National Coming Out Day!");
   	colorWipe(pixels.Color(255, 0, 0), 50); // Red
   	colorWipe(pixels.Color(0, 255, 0), 50); // Green
   	colorWipe(pixels.Color(0, 0, 255), 50); // Blue
