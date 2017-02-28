@@ -351,7 +351,7 @@ void setup()
 void FireEmsCheck() {
   WiFiClient client;
   if (client.connect(SERVER_NAME, SERVER_PORT)) {
-    Serial.println("connected");
+    Serial.println("Fire/EMS email check: connected");
     // Make a HTTP request:
     client.println("GET /GetGmail.php");  // Apache server pathway.
     client.println();
