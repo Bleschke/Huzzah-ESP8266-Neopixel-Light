@@ -1,9 +1,9 @@
 /* 
  * Brian Leschke
- * February 27, 2017
+ * February 28, 2017
  * Adafruit Huzzah ESP 8266 Neopixel Light
  * The ESP8266 will control a neopixel and change the color based on Weather events, Holidays, and Fire/EMS calls.
- * Version 1.1
+ * Version 1.4
  * 
  *
  * -- Credit and Recognition: --
@@ -13,7 +13,7 @@
  * 
  * 2/26/17 - Initial Release - Fire/EMS and Weather Alerts implemented
  * 2/27/17 - Added NTP Client and Morse Code
- *
+ * 2/28/17 - Added Date Events (Holidays)
  *
  * 
 */
@@ -26,6 +26,7 @@
 #include <FS.h>
 #include <ArduinoOTA.h>
 #include <ArduinoJson.h>
+#include <SPI.h>
 
 #include <Adafruit_NeoPixel.h>
 #ifdef __AVR__
@@ -49,25 +50,26 @@ const char* ap_default_psk  = "esp8266";   // Default PSK.
 
 
 // ** Wunderground Information **
+WiFiClient client;
 String responseString;
 boolean startCapture;
 
 const char   WxServer[]        = "api.wunderground.com"; // name address for Weather Underground (using DNS)
-const String myKey             = "API-KEY";         //See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
+const String myKey             = "API_KEY";         //See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
 const String myWxAlertFeatures = "alerts";               // Do Not Change. See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
 const String myWxFeatures      = "conditions";           // Do Not Change. See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
-const String myState           = "ABBREV STATE";    //See: http://www.wunderground.com/weather/api/d/docs?d=resources/country-to-iso-matching
+const String myState           = "ABBREV_STATE";    //See: http://www.wunderground.com/weather/api/d/docs?d=resources/country-to-iso-matching
 const String myCity            = "CITY";                 //See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
 
 long wxAlertCheckInterval           = 900000; // 15min default. Time (milliseconds) until next weather alert check
-unsigned long previousWxAlertMillis = 0;
+unsigned long previousWxAlertMillis = 0;      // Do not change.
 // long wxCheckInterval             = 900000; // 15min default. Time (milliseconds) until next weather check
-// unsigned long previousWxMillis   = 0;
+// unsigned long previousWxMillis   = 0;      // Do not change.
 
 
 // ** FIRE-EMS INFORMATION **
-char SERVER_NAME[]    = "SERVER ADDRESS"; // Address of the webserver
-int SERVER_PORT       = PORT HERE;       // webserver port
+char SERVER_NAME[]    = "SERVER_ADDRESS"; // Address of the webserver
+int SERVER_PORT       = 42391;       // webserver port
 
 char Str[11];
 int prevNum           = 0; //Number of previous emails before check
@@ -82,14 +84,6 @@ const int timePort      = 13;
 int ln = 0;
 String TimeDate = "";
 
-/*
-WiFiUDP ntpUDP;
-// You can specify the time server pool and the offset, (in seconds)
-// additionaly you can specify the update interval (in milliseconds).
-// NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
-NTPClient timeClient(ntpUDP); // default 'time.nist.gov'
-
-*/
 
 // ** MORSE CODE TRANSMISSION INFORMATION **
 #define N_MORSE  (sizeof(morsetab)/sizeof(morsetab[0]))
@@ -97,7 +91,7 @@ NTPClient timeClient(ntpUDP); // default 'time.nist.gov'
 #define SPEED  (12)
 #define DOTLEN  (1200/SPEED)
 #define DASHLEN  (3*(1200/SPEED))
-int LEDpin = 2 ;
+int txPin = 5;
 
 struct t_mtab { char c, pat; } ;
 
@@ -144,10 +138,8 @@ struct t_mtab morsetab[] = {
   {'0', 63}
 } ;
 
-
 // Uncomment the next line for verbose output over UART.
 #define SERIAL_VERBOSE
-
 
 
 // ---------- OTA CONFIGURATION - DO NOT MODIFY ----------
@@ -241,7 +233,7 @@ void setup()
 
   Serial.begin(115200);
   pixels.begin(); // This initializes the NeoPixel library.
-  pinMode(LEDpin, OUTPUT) ; // Initialize Hellschreiber transmission output.
+  pinMode(txPin, OUTPUT) ; // Initialize Morse Code transmission output.
   
   delay(100);
 
@@ -323,7 +315,42 @@ void setup()
     // ... print IP Address
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
-  }
+
+
+    //***** if you get a connection, report back via serial:
+    if (client.connect(WxServer, 80))
+    {
+      Serial.println("Connected to Wunderground!");
+    
+      String html_cmd1 = "GET /api/" + myKey + "/" + myWxAlertFeatures + "/q/" + myState + "/" + myCity + ".json HTTP/1.1";
+      String html_cmd2 = "Host: " + (String)WxServer;
+      String html_cmd3 = "Connection: close";
+    
+      //Uncomment this if necessary
+      //Serial.println("Sending commands:");
+      //Serial.println(" " + html_cmd1);
+      //Serial.println(" " + html_cmd2);
+      //Serial.println(" " + html_cmd3);
+      //Serial.println();
+    
+      // Make a HTTP request:
+      client.println(html_cmd1);
+      client.println(html_cmd2);
+      client.println(html_cmd3);
+      client.println();
+    
+      responseString = "";
+      startCapture = false;   
+    } 
+    else
+    {
+      // if you didn't get a connection to the server:
+      Serial.println("Wunderground Weather Alerts: Connection failed.");
+    }
+
+    }
+
+
   else
   {
     Serial.println("Can not connect to WiFi station. Go into AP mode.");
@@ -423,54 +450,27 @@ void FireEmsCheck() {
     pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
     pixels.show(); // This sends the updated pixel color to the hardware.
   }
-  pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
-  pixels.show(); // This sends the updated pixel color to the hardware.
+  //pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
+  //pixels.show(); // This sends the updated pixel color to the hardware.
   delay(2000);
 }
 
 void WeatherAlerts() {
-  // if you get a connection, report back via serial:
-  WiFiClient client;
-  if (client.connect(WxServer, 80))
-  {
-    Serial.println("Connected to Wunderground!");
-    
-    String html_cmd1 = "GET /api/" + myKey + "/" + myWxAlertFeatures + "/q/" + myState + "/" + myCity + ".json HTTP/1.1";
-    String html_cmd2 = "Host: " + (String)WxServer;
-    String html_cmd3 = "Connection: close";
-    
-    //Uncomment this if necessary
-    //Serial.println("Sending commands:");
-    //Serial.println(" " + html_cmd1);
-    //Serial.println(" " + html_cmd2);
-    //Serial.println(" " + html_cmd3);
-    //Serial.println();
-    
-    // Make a HTTP request:
-    client.println(html_cmd1);
-    client.println(html_cmd2);
-    client.println(html_cmd3);
-    client.println();
-    
-    responseString = "";
-    startCapture = false;   
-  } 
-  else
-  {
-    // if you didn't get a connection to the server:
-    Serial.println("Wunderground Weather Alerts: Connection failed.");
-  }
+WiFiClient client;
 
   // if there are incoming bytes available 
   // from the server, read them and buffer:
   if (client.available())
   {
     char c = client.read();
-    if(c == '{')
+    if(c == '{'){
       startCapture=true;
     
     if(startCapture)
       responseString += c;
+    Serial.print("Response String: ");
+    Serial.print(responseString);
+    }
   }
 
   // if the server's disconnected, stop the client:
@@ -480,11 +480,15 @@ void WeatherAlerts() {
     client.stop();
     client.flush();
     Serial.println();
-    
+
+    Serial.print("Response String: ");
+    Serial.print(responseString);
+    Serial.println("");
+    Serial.println(getValuesFromKey(responseString, "type"));
     Serial.print("Alerts: ");
-    if (responseString == "TOR") // Tornado Warning
+    if (getValuesFromKey(responseString, "type") == "TOR") // Tornado Warning
     {
-      Serial.println(getValuesFromKey(responseString, "alerts"));
+      Serial.println("Tornado Warning");
       for(int x = 0; x < 200; x++)  // Neopixel LED blinks 200 times.
       {
         pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
@@ -497,9 +501,9 @@ void WeatherAlerts() {
         delay(250);
       } 
     }
-    else if (responseString == "TOW") // Tornado Watch
+    else if (getValuesFromKey(responseString, "type") == "TOW") // Tornado Watch
     {
-      Serial.println(getValuesFromKey(responseString, "alerts"));
+      Serial.println("Tornado Watch");
       for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
       {
         pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
@@ -512,13 +516,13 @@ void WeatherAlerts() {
         delay(250);
       } 
     }
-    else if (responseString == "WRN") // Severe Thunderstorm Warning
+    else if (getValuesFromKey(responseString, "type") == "WRN") // Severe Thunderstorm Warning
     {
-      Serial.println(getValuesFromKey(responseString, "alerts"));
+      Serial.println("Severe Thunderstorm Warning");
       for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
       {
         pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
-        pixels.setPixelColor(0, pixels.Color(255,165,0)); // ORANGE
+        pixels.setPixelColor(0, pixels.Color(255,95,0)); // ORANGE
         pixels.show(); // This sends the updated pixel color to the hardware.
         delay(250);
         pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
@@ -527,13 +531,13 @@ void WeatherAlerts() {
         delay(250);
       } 
     }    
-    else if (responseString == "WIN") // Winter Weather
+    else if (getValuesFromKey(responseString, "type") == "WIN") // Winter Weather
     {
-      Serial.println(getValuesFromKey(responseString, "alerts"));
+      Serial.println("Winter Weather");
       for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
       {
         pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF  
-        pixels.setPixelColor(0, pixels.Color(255,153,171)); // Pink
+        pixels.setPixelColor(0, pixels.Color(255,162,178)); // Pink
         pixels.show(); // This sends the updated pixel color to the hardware.
         delay(250);
         pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF
@@ -607,17 +611,17 @@ String getValuesFromKey(const String response, const String sKey)
 
 void dash()
 {
-  digitalWrite(LEDpin, HIGH) ;
+  digitalWrite(txPin, HIGH) ;
   delay(DASHLEN);
-  digitalWrite(LEDpin, LOW) ;
+  digitalWrite(txPin, LOW) ;
   delay(DOTLEN) ;
 }
 
 void dit()
 {
-  digitalWrite(LEDpin, HIGH) ;
+  digitalWrite(txPin, HIGH) ;
   delay(DOTLEN);
-  digitalWrite(LEDpin, LOW) ;
+  digitalWrite(txPin, LOW) ;
   delay(DOTLEN);
 }
 
@@ -657,7 +661,7 @@ void sendmsg(char *str)
 }
 
 
-void getDateTime()
+void timeDateEvents()
 {
   Serial.print("connecting to ");
   Serial.println(timeHost);
@@ -678,7 +682,6 @@ void getDateTime()
   // Read all the lines of the reply from server and print them to Serial
   // expected line is like : Date: Thu, 01 Jan 2015 22:00:14 GMT
   char buffer[12];
-  String dateTime = "";
 
   while(client.available())
   {
@@ -690,19 +693,113 @@ void getDateTime()
     } else
     {
       // Serial.print(line);
-      // date starts at pos 7
-      TimeDate = line.substring(7);
+      // date starts at pos 10. We don't need the year.
+      TimeDate = line.substring(10);
+      Serial.println("UTC Time and Date:");
       Serial.println(TimeDate);
       // time starts at pos 14
-      TimeDate = line.substring(7, 15);
+      TimeDate = line.substring(10, 15);
       TimeDate.toCharArray(buffer, 10);
-      Serial.println("UTC Date:");
+      Serial.println("UTC Date:");    // MM-DD
       Serial.println(buffer);
       //TimeDate = line.substring(16, 24);
       //TimeDate.toCharArray(buffer, 10);
       //Serial.println(buffer);
 
+      if (stricmp ("01-01",buffer) == 0)
+      {
+	Serial.println("Happy New Year!");
+  	colorWipe(pixels.Color(255, 0, 0), 50); // Red
+  	colorWipe(pixels.Color(0, 255, 0), 50); // Green
+  	colorWipe(pixels.Color(0, 0, 255), 50); // Blue
+  	rainbow(20);
+  	rainbowCycle(20);
+      }
+      else if (stricmp ("07-04",buffer) == 0)
+      {
+	Serial.println("Happy 4th of July!");
+  	colorWipe(pixels.Color(255, 0, 0), 50);     // Red
+  	colorWipe(pixels.Color(255, 255, 255), 50); // White
+  	colorWipe(pixels.Color(0, 0, 255), 50);     // Blue
+  	rainbow(20);
+  	rainbowCycle(20);
+      }
+      else if (stricmp ("10-11",buffer) == 0)
+      {
+	Serial.println("Happy National Coming out Day!");
+  	colorWipe(pixels.Color(255, 0, 0), 50); // Red
+  	colorWipe(pixels.Color(0, 255, 0), 50); // Green
+  	colorWipe(pixels.Color(0, 0, 255), 50); // Blue
+  	rainbow(20);
+  	rainbowCycle(20);
+      }
+      else if (stricmp ("12-25",buffer) == 0)
+      {
+	Serial.println("Merry Christmas!");
+  	colorWipe(pixels.Color(255, 0, 0), 50); // Red
+  	colorWipe(pixels.Color(0, 255, 0), 50); // Green
+  	rainbow(20);
+  	rainbowCycle(20);
+      }
+      else
+      {
+	Serial.print("No date events for: ");
+        Serial.print(buffer);
+        Serial.println("");
+        pixels.setPixelColor(0, pixels.Color(0,0,0)); // OFF
+        pixels.setPixelColor(0, pixels.Color(255,255,255)); // WHITE
+        pixels.show(); // This sends the updated pixel color to the hardware.
+      }
+
     }
+  }
+}
+
+// Fill the dots one after the other with a color
+void colorWipe(uint32_t c, uint8_t wait) {
+  for(uint16_t i=0; i<pixels.numPixels(); i++) {
+      pixels.setPixelColor(i, c);
+      pixels.show();
+      delay(wait);
+  }
+}
+ 
+void rainbow(uint8_t wait) {
+  uint16_t i, j;
+ 
+  for(j=0; j<256; j++) {
+    for(i=0; i<pixels.numPixels(); i++) {
+      pixels.setPixelColor(i, Wheel((i+j) & 255));
+    }
+    pixels.show();
+    delay(wait);
+  }
+}
+ 
+// Slightly different, this makes the rainbow equally distributed throughout
+void rainbowCycle(uint8_t wait) {
+  uint16_t i, j;
+ 
+  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
+    for(i=0; i< pixels.numPixels(); i++) {
+      pixels.setPixelColor(i, Wheel(((i * 256 / pixels.numPixels()) + j) & 255));
+    }
+    pixels.show();
+    delay(wait);
+  }
+}
+ 
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  if(WheelPos < 85) {
+   return pixels.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  } else if(WheelPos < 170) {
+   WheelPos -= 85;
+   return pixels.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  } else {
+   WheelPos -= 170;
+   return pixels.Color(0, WheelPos * 3, 255 - WheelPos * 3);
   }
 }
 
@@ -712,21 +809,20 @@ void loop()
 {
   // Handle OTA server.
   ArduinoOTA.handle();
+  yield();
   
 
   // ---------- USER CODE GOES HERE ----------
 
   // ** Transmit Morse Code **
-  sendmsg("CALLSIGN HERE"); // FCC callsign and Message
-  
-  // ** Receive Time (NTP)**
-  getDateTime();
-  //timeClient.update();
-  //Serial.println(timeClient.getFormattedTime()); //prints time in 'hh:mm:ss'
-  //delay(1000);
+  sendmsg("CALLSIGN"); // FCC callsign and Message
+ 
 
   // ** FireEMS Alert Check **
   FireEmsCheck();
+
+  // ** Receive Time (NTP) and run events**
+  timeDateEvents();  //20 is the amount of speed delay for color changing
 
   // ** Weather Alert Check **
   unsigned long currentWxAlertMillis = millis();
@@ -768,5 +864,4 @@ void loop()
 */  
   
   // ---------- USER CODE GOES HERE ----------
-  yield();
 }
