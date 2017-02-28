@@ -315,42 +315,7 @@ void setup()
     // ... print IP Address
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
-
-
-    //***** if you get a connection, report back via serial:
-    if (client.connect(WxServer, 80))
-    {
-      Serial.println("Connected to Wunderground!");
-    
-      String html_cmd1 = "GET /api/" + myKey + "/" + myWxAlertFeatures + "/q/" + myState + "/" + myCity + ".json HTTP/1.1";
-      String html_cmd2 = "Host: " + (String)WxServer;
-      String html_cmd3 = "Connection: close";
-    
-      //Uncomment this if necessary
-      //Serial.println("Sending commands:");
-      //Serial.println(" " + html_cmd1);
-      //Serial.println(" " + html_cmd2);
-      //Serial.println(" " + html_cmd3);
-      //Serial.println();
-    
-      // Make a HTTP request:
-      client.println(html_cmd1);
-      client.println(html_cmd2);
-      client.println(html_cmd3);
-      client.println();
-    
-      responseString = "";
-      startCapture = false;   
-    } 
-    else
-    {
-      // if you didn't get a connection to the server:
-      Serial.println("Wunderground Weather Alerts: Connection failed.");
-    }
-
-    }
-
-
+  }
   else
   {
     Serial.println("Can not connect to WiFi station. Go into AP mode.");
@@ -457,6 +422,36 @@ void FireEmsCheck() {
 
 void WeatherAlerts() {
 WiFiClient client;
+    //***** if you get a connection, report back via serial:
+    if (client.connect(WxServer, 80))
+    {
+      Serial.println("Connected to Wunderground!");
+    
+      String html_cmd1 = "GET /api/" + myKey + "/" + myWxAlertFeatures + "/q/" + myState + "/" + myCity + ".json HTTP/1.1";
+      String html_cmd2 = "Host: " + (String)WxServer;
+      String html_cmd3 = "Connection: close";
+    
+      //Uncomment this if necessary
+      //Serial.println("Sending commands:");
+      //Serial.println(" " + html_cmd1);
+      //Serial.println(" " + html_cmd2);
+      //Serial.println(" " + html_cmd3);
+      //Serial.println();
+    
+      // Make a HTTP request:
+      client.println(html_cmd1);
+      client.println(html_cmd2);
+      client.println(html_cmd3);
+      client.println();
+    
+      responseString = "";
+      startCapture = false;   
+    } 
+    else
+    {
+      // if you didn't get a connection to the server:
+      Serial.println("Wunderground Weather Alerts: Connection failed.");
+    }
 
   // if there are incoming bytes available 
   // from the server, read them and buffer:
