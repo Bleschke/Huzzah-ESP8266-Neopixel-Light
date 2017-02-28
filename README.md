@@ -13,10 +13,10 @@ Currently Implemented:
     * Severe Thunderstorm Warning
     * Winter Weather
 * Morse Code transmission from 433 Mhz chip
+* Lights change color for Holidays
 
 Future Implementations:
 * Lights change color per weather conditions (debatable)
-* Lights change color for Holidays
 
 ### **Prerequisities**
 
