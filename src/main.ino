@@ -499,6 +499,7 @@ void dit()
 
 void send(char c)
 {
+  yield();
   int i ;
   if (c == ' ') {
     Serial.print(c) ;
@@ -527,6 +528,7 @@ void send(char c)
 
 void sendmsg(char *str)
 {
+  yield();
   while (*str)
     send(*str++) ;
   Serial.println("");
@@ -535,6 +537,7 @@ void sendmsg(char *str)
 
 void timeDateEvents()
 {
+  yield();
   Serial.print("connecting to ");
   Serial.println(timeHost);
 
