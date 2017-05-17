@@ -19,6 +19,7 @@
 */
 
 // includes
+#include <Wire.h> // Enable this line if using Arduino Uno, Mega, etc.
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
@@ -57,14 +58,11 @@ boolean startCapture;
 const char   WxServer[]        = "api.wunderground.com"; // name address for Weather Underground (using DNS)
 const String myKey             = "API_KEY";         //See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
 const String myWxAlertFeatures = "alerts";               // Do Not Change. See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
-const String myWxFeatures      = "conditions";           // Do Not Change. See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
 const String myState           = "ABBREV_STATE";    //See: http://www.wunderground.com/weather/api/d/docs?d=resources/country-to-iso-matching
 const String myCity            = "CITY";                 //See: http://www.wunderground.com/weather/api/d/docs?d=data/index&MR=1
 
 long wxAlertCheckInterval           = 900000; // 15min default. Time (milliseconds) until next weather alert check
 unsigned long previousWxAlertMillis = 0;      // Do not change.
-// long wxCheckInterval             = 900000; // 15min default. Time (milliseconds) until next weather check
-// unsigned long previousWxMillis   = 0;      // Do not change.
 
 
 // ** FIRE-EMS INFORMATION **
@@ -144,85 +142,6 @@ struct t_mtab morsetab[] = {
 
 // ---------- OTA CONFIGURATION - DO NOT MODIFY ----------
 
-bool loadConfig(String *ssid, String *pass)
-{
-  // open file for reading.
-  File configFile = SPIFFS.open("/cl_conf.txt", "r");
-  if (!configFile)
-  {
-    Serial.println("Failed to open cl_conf.txt.");
-
-    return false;
-  }
-
-  // Read content from config file.
-  String content = configFile.readString();
-  configFile.close();
-  
-  content.trim();
-
-  // Check if ther is a second line available.
-  int8_t pos = content.indexOf("\r\n");
-  uint8_t le = 2;
-  // check for linux and mac line ending.
-  if (pos == -1)
-  {
-    le = 1;
-    pos = content.indexOf("\n");
-    if (pos == -1)
-    {
-      pos = content.indexOf("\r");
-    }
-  }
-
-  // If there is no second line: Some information is missing.
-  if (pos == -1)
-  {
-    Serial.println("Invalid content.");
-    Serial.println(content);
-
-    return false;
-  }
-
-  // Store SSID and PSK into string vars.
-  *ssid = content.substring(0, pos);
-  *pass = content.substring(pos + le);
-
-  ssid->trim();
-  pass->trim();
-
-#ifdef SERIAL_VERBOSE
-  Serial.println("----- file content -----");
-  Serial.println(content);
-  Serial.println("----- file content -----");
-  Serial.println("ssid: " + *ssid);
-  Serial.println("psk:  " + *pass);
-#endif
-
-  return true;
-} // loadConfig
-
-bool saveConfig(String *ssid, String *pass)
-{
-  // Open config file for writing.
-  File configFile = SPIFFS.open("/cl_conf.txt", "w");
-  if (!configFile)
-  {
-    Serial.println("Failed to open cl_conf.txt for writing");
-
-    return false;
-  }
-
-  // Save SSID and PSK.
-  configFile.println(*ssid);
-  configFile.println(*pass);
-
-  configFile.close();
-  
-  return true;
-} // saveConfig
-
-
 void setup()
 {
   pixels.setPixelColor(0, pixels.Color(0,0,0)); // OFF
@@ -236,104 +155,66 @@ void setup()
   pinMode(txPin, OUTPUT) ; // Initialize Morse Code transmission output.
   
   delay(100);
-
-  Serial.println("\r\n");
-  Serial.print("Chip ID: 0x");
-  Serial.println(ESP.getChipId(), HEX);
-
-  // Set Hostname.
-  String hostname(HOSTNAME);
-  hostname += String(ESP.getChipId(), HEX);
-  WiFi.hostname(hostname);
-
-  // Print hostname.
-  Serial.println("Hostname: " + hostname);
-  //Serial.println(WiFi.hostname());
-
-
-  // Initialize file system.
-  if (!SPIFFS.begin())
-  {
-    Serial.println("Failed to mount file system");
-    return;
-  }
-
-  // Load wifi connection information.
-  if (! loadConfig(&station_ssid, &station_psk))
-  {
-    station_ssid = "";
-    station_psk = "";
-
-    Serial.println("No WiFi connection information available.");
-  }
-
-  // Check WiFi connection
-  // ... check mode
-  if (WiFi.getMode() != WIFI_STA)
-  {
-    WiFi.mode(WIFI_STA);
-    delay(10);
-  }
-
-  // ... Compare file config with sdk config.
-  if (WiFi.SSID() != station_ssid || WiFi.psk() != station_psk)
-  {
-    Serial.println("WiFi config changed.");
-
-    // ... Try to connect to WiFi station.
-    WiFi.begin(station_ssid.c_str(), station_psk.c_str());
-
-    // ... Pritn new SSID
-    Serial.print("new SSID: ");
-    Serial.println(WiFi.SSID());
-
-    // ... Uncomment this for debugging output.
-    //WiFi.printDiag(Serial);
-  }
-  else
-  {
-    // ... Begin with sdk config.
-    WiFi.begin();
-  }
-
-  Serial.println("Wait for WiFi connection.");
-
-  // ... Give ESP 10 seconds to connect to station.
-  unsigned long startTime = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000)
-  {
-    Serial.write('.');
-    //Serial.print(WiFi.status());
-    delay(500);
-  }
-  Serial.println();
-  //timeClient.begin(); // Start the time client
-
-  // Check connection
-  if(WiFi.status() == WL_CONNECTED)
-  {
-    // ... print IP Address
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-  }
-  else
-  {
-    Serial.println("Can not connect to WiFi station. Go into AP mode.");
+	
+  WiFi.begin(ssid, password);
+  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    Serial.println("Connection Failed! Rebooting...");
     
-    // Go into software AP mode.
-    WiFi.mode(WIFI_AP);
-
-    delay(10);
-
-    WiFi.softAP(ap_default_ssid, ap_default_psk);
-
-    Serial.print("IP address: ");
-    Serial.println(WiFi.softAPIP());
+    delay(2000);
+    ESP.restart();
   }
 
-  // Start OTA server.
-  ArduinoOTA.setHostname((const char *)hostname.c_str());
+  // Port defaults to 8266
+  //ArduinoOTA.setPort(8266);
+
+  // Hostname defaults to esp8266-[ChipID]
+  // ArduinoOTA.setHostname("myesp8266");
+
+  // No authentication by default
+  ArduinoOTA.setPassword((const char *)"OTA_PASSWORD");    // OTA auth password
+
+  ArduinoOTA.onStart([]() {
+    Serial.println("Start");
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("End");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR)
+    {
+      Serial.println("Auth Failed");
+    }
+    else if (error == OTA_BEGIN_ERROR)
+    {
+      Serial.println("Begin Failed");
+    }
+    else if (error == OTA_CONNECT_ERROR)
+    {
+      Serial.println("Connect Failed");
+    }
+    else if (error == OTA_RECEIVE_ERROR)
+    {
+      Serial.println("Receive Failed");
+    }
+    else if (error == OTA_END_ERROR)
+    {
+      Serial.println("End Failed");
+    }
+  });
   ArduinoOTA.begin();
+  Serial.println("Ready");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+  lcd.clear();
+  lcd.setCursor(0,1);
+  lcd.print("WiFi: Connected");
+  lcd.setCursor(0,2);
+  lcd.print(WiFi.localIP());
+  delay(1000);
 }
 
 // ---------- OTA CONFIGURATION - DO NOT MODIFY ----------
@@ -341,6 +222,7 @@ void setup()
 // ---------- ESP 8266 FUNCTIONS - CAN BE REMOVED ----------
 
 void FireEmsCheck() {
+  yield();
   WiFiClient client;
   if (client.connect(SERVER_NAME, SERVER_PORT)) {
     Serial.println("Fire/EMS email check: connected");
@@ -419,6 +301,7 @@ void FireEmsCheck() {
 }
 
 void WeatherAlerts() {
+yield();
 WiFiClient client;
     //***** if you get a connection, report back via serial:
     if (client.connect(WxServer, 80))
@@ -835,26 +718,6 @@ void loop()
     Serial.println(currentWxAlertMillis-previousWxAlertMillis);
     Serial.println();
   }
-
-/*  // ** Weather Check **
-  unsigned long currentWxMillis = millis();
-  
-  if(currentWxMillis - previousWxMillis >= wxCheckInterval) {
-    Serial.println("Checking for Weather Alerts");
-    WeatherAlerts();
-    previousWxMillis = currentWxMillis; //remember the time(millis)
-  }
-  else {
-    Serial.println("Bypassing Weather Check. Less than 15 minutes since last check.");
-    Serial.println("Previous Millis: ");
-    Serial.println(previousWxMillis);
-    Serial.println("Current Millis: ");
-    Serial.println(currentWxMillis);
-    Serial.println("Subtracted Millis");
-    Serial.println(currentWxMillis-previousWxMillis);
-    Serial.println();
-  }
-*/  
   
   // ---------- USER CODE GOES HERE ----------
 }
