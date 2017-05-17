@@ -15,9 +15,6 @@ Currently Implemented:
 * Morse Code transmission from 433 Mhz chip
 * Lights change color for Holidays
 
-Future Implementations:
-* Lights change color per weather conditions (debatable)
-
 ### **Prerequisities**
 
 You will need:
