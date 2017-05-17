@@ -68,7 +68,7 @@ unsigned long previousWxAlertMillis = 0;      // Do not change.
 
 // ** FIRE-EMS INFORMATION **
 char SERVER_NAME[]    = "SERVER_ADDRESS"; // Address of the webserver
-int SERVER_PORT       = 42391;       // webserver port
+int SERVER_PORT       = SERVER_PORT;       // webserver port
 
 char Str[11];
 int prevNum           = 0; //Number of previous emails before check
