@@ -210,11 +210,6 @@ void setup()
   Serial.println("Ready");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-  lcd.clear();
-  lcd.setCursor(0,1);
-  lcd.print("WiFi: Connected");
-  lcd.setCursor(0,2);
-  lcd.print(WiFi.localIP());
   delay(1000);
 }
 
