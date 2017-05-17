@@ -1,6 +1,6 @@
 /* 
  * Brian Leschke
- * February 28, 2017
+ * May 16, 2017
  * Adafruit Huzzah ESP 8266 Neopixel Light
  * The ESP8266 will control a neopixel and change the color based on Weather events, Holidays, and Fire/EMS calls.
  * Version 1.4
@@ -14,6 +14,7 @@
  * 2/26/17 - Initial Release - Fire/EMS and Weather Alerts implemented
  * 2/27/17 - Added NTP Client and Morse Code
  * 2/28/17 - Added Date Events (Holidays)
+ * 5/16/17 - Removed platformio support and OTA by platformio. Arduino software will only be used for updating. 
  *
  * 
 */
