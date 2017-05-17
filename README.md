@@ -22,9 +22,8 @@ You will need:
 1. Adafruit Huzzah ESP8266 (http://adafru.it/2471)
 2. Flora Neopixel (http://adafru.it/1312)
 3. Arduino Programming software
-4. Operating system that supports PlatformIO
-5. FTDI cable (https://www.sparkfun.com/products/9717)
-6. Radio Transmitter (https://www.sparkfun.com/products/10534)
+4. FTDI cable (https://www.sparkfun.com/products/9717)
+5. Radio Transmitter (https://www.sparkfun.com/products/10534)
 
 ### **Usage**
 
