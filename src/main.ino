@@ -47,9 +47,9 @@
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
 
-// ** Default WiFi connection Information **
-const char* ap_default_ssid = "esp8266";   // Default SSID.
-const char* ap_default_psk  = "esp8266";   // Default PSK.
+// ** WiFi connection and OTA Information **
+const char*     ssid = "WIFI_SSID";       // Default SSID.
+const char* password = "WIFI_PASSWORD";   // Default PSK.
 
 
 // ** Wunderground Information **
