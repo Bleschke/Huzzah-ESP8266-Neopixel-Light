@@ -15,6 +15,7 @@
  * 2/27/17 - Added NTP Client and Morse Code
  * 2/28/17 - Added Date Events (Holidays)
  * 5/16/17 - Removed platformio support and OTA by platformio. Arduino software will only be used for updating. 
+ * 8/8/17  - Modified weather alert parsing code
  *
  * 
 */
@@ -64,6 +65,21 @@ const String myCity            = "CITY";                 //See: http://www.wunde
 
 long wxAlertCheckInterval           = 900000; // 15min default. Time (milliseconds) until next weather alert check
 unsigned long previousWxAlertMillis = 0;      // Do not change.
+
+// ** JSON Parser Information
+const int buffer_size = 300;                        // Do not change. Length of json buffer
+const int buffer=300;                               // Do not change.
+int passNum = 1;                                    // Do not change.
+
+char* weatherConds[]={                                // Do not change.
+   "\"type\":",
+   "\"description\":",
+   "\"date\":",
+   "\"expires\":",
+};
+
+int num_elements        = 4;  // number of conditions you are retrieving, count of elements in conds
+unsigned long WMillis   = 0;  // temporary millis() register
 
 
 // ** FIRE-EMS INFORMATION **
@@ -298,112 +314,139 @@ void FireEmsCheck() {
 
 void WeatherAlerts() {
 yield();
+// Use WiFiClient class to create TCP connections
 WiFiClient client;
     //***** if you get a connection, report back via serial:
-    if (client.connect(WxServer, 80))
+    if (!client.connect(WxServer, 80))
     {
-      Serial.println("Connected to Wunderground!");
+      Serial.println("Connection Failed: Wunderground");
+      return
+    }
     
-      String html_cmd1 = "GET /api/" + myKey + "/" + myWxAlertFeatures + "/q/" + myState + "/" + myCity + ".json HTTP/1.1";
-      String html_cmd2 = "Host: " + (String)WxServer;
-      String html_cmd3 = "Connection: close";
-    
-      //Uncomment this if necessary
-      //Serial.println("Sending commands:");
-      //Serial.println(" " + html_cmd1);
-      //Serial.println(" " + html_cmd2);
-      //Serial.println(" " + html_cmd3);
-      //Serial.println();
-    
-      // Make a HTTP request:
-      client.println(html_cmd1);
-      client.println(html_cmd2);
-      client.println(html_cmd3);
-      client.println();
-    
-      responseString = "";
-      startCapture = false;   
-    } 
-    else
+  String cmd = "GET /api/" + myKey + "/" + myWxAlertFeatures + "/q/" + myState + "/" + myCity + ".json HTTP/1.1; // build request_string cmd
+  cmd += " HTTP/1.1\r\nHost: api.wunderground.com\r\n\r\n"; 
+  delay(500);
+  client.print(cmd);                                            
+  delay(500);
+  unsigned int i = 0;                                           // timeout counter
+  char json[buffer_size]="{";                                   // first character for json-string is begin-bracket 
+  int n = 1;                                                    // character counter for json
+  
+  
+  for (int j=0;j<num_elements;j++){                             // do the loop for every element/condition
+    boolean quote = false; int nn = false;                      // if quote=fals means no quotes so comma means break
+    while (!client.find(weatherConds[j]))                         // If metro condition data is not available, try again.
     {
-      // if you didn't get a connection to the server:
-      Serial.println("Wunderground Weather Alerts: Connection failed.");
-    }
-
-  // if there are incoming bytes available 
-  // from the server, read them and buffer:
-  if (client.available())
-  {
-    char c = client.read();
-    if(c == '{'){
-      startCapture=true;
-    
-    if(startCapture)
-      responseString += c;
-    Serial.print("Response String: ");
-    Serial.print(responseString);
-    }
+      pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
+      pixels.show(); // This sends the updated pixel color to the hardware.
+      Serial.println("No data available");
+      return;
+    }                            
+  
+    String Str1= weatherConds[j];                                     // Str1 gets the name of element/condition
+  
+    for (int l=0; l<(Str1.length());l++)                        // for as many character one by one
+        {json[n] = Str1[l];                                     // fill the json string with the name
+         n++;}                                                  // character count +1
+    while (i<5000) {                                            // timer/counter
+      if(client.available()) {                                  // if character found in receive-buffer
+        char c = client.read();                                 // read that character
+           Serial.print(c);                                     // 
+           
+// ************************ construction of json string converting comma's inside quotes to dots ******************** 
+               if ((c=='"') && (quote==false))                  // there is a " and quote=false, so start of new element
+                  {quote = true;nn=n;}                          // make quote=true and notice place in string
+               if ((c==',')&&(quote==true)) {c='.';}            // if there is a comma inside quotes, comma becomes a dot.
+               if ((c=='"') && (quote=true)&&(nn!=n))           // if there is a " and quote=true and on different position
+                  {quote = false;}                              // quote=false meaning end of element between ""
+               if((c==',')&&(quote==false)) break;              // if comma delimiter outside "" then end of this element
+ // ****************************** end of construction ******************************************************
+          json[n]=c;                                            // fill json string with this character
+          n++;                                                  // character count + 1
+          i=0;                                                  // timer/counter + 1
+        }
+        i++;                                                    // add 1 to timer/counter
+      }                    // end while i<5000
+     if (j==num_elements-1)                                     // if last element
+        {json[n]='}';}                                          // add end bracket of json string
+     else                                                       // else
+        {json[n]=',';}                                          // add comma as element delimiter
+     n++;                                                       // next place in json string
   }
+  Serial.println(json);                                         // debugging json string 
+  parseJSON(json);                                              // extract the conditions
+  WMillis=millis();
+}
 
-  // if the server's disconnected, stop the client:
-  if (!client.connected()) {    
-    Serial.println("Received " + (String)responseString.length() + " bytes");
-    Serial.println("Disconnecting.");
-    client.stop();
-    client.flush();
-    Serial.println();
+void parseJSON(char json[300])
+{
+  StaticJsonBuffer<buffer> jsonBuffer;
+  JsonObject& root = jsonBuffer.parseObject(json);
+ 
+ if (!root.success())
+{
+  lcd.setCursor(0,3);
+  lcd.print("?fparseObject() failed");
+  //return;
+}
 
-    Serial.print("Response String: ");
-    Serial.print(responseString);
-    Serial.println("");
-    Serial.println(getValuesFromKey(responseString, "type"));
-    Serial.print("Alerts: ");
-    if (getValuesFromKey(responseString, "type") == "TOR") // Tornado Warning
+ const char* type         = root["type"];
+ const char* description  = root["description"];
+ const char* date         = root["date"];
+ const char* expires      = root["expires"];
+
+ 
+ Serial.println(type);
+ Serial.println(description);
+ Serial.println(date);
+ Serial.println(expires);
+	
+ if (type == "TOR") // Tornado Warning
+ {
+  Serial.println("Tornado Warning");
+  for(int x = 0; x < 200; x++)  // Neopixel LED blinks 200 times.
     {
-      Serial.println("Tornado Warning");
-      for(int x = 0; x < 200; x++)  // Neopixel LED blinks 200 times.
-      {
-        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
-        pixels.setPixelColor(0, pixels.Color(255,0,0));   // RED
-        pixels.show(); // This sends the updated pixel color to the hardware.
-        delay(250);
-        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
-        pixels.setPixelColor(0, pixels.Color(255,95,0)); // ORANGE
-        pixels.show(); // This sends the updated pixel color to the hardware.
-        delay(250);
-      } 
-    }
-    else if (getValuesFromKey(responseString, "type") == "TOW") // Tornado Watch
-    {
-      Serial.println("Tornado Watch");
-      for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
-      {
-        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
-        pixels.setPixelColor(0, pixels.Color(255,0,0));   // RED
-        pixels.show(); // This sends the updated pixel color to the hardware.
-        delay(250);
-        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
-        pixels.setPixelColor(0, pixels.Color(255,255,0)); // YELLOW
-        pixels.show(); // This sends the updated pixel color to the hardware.
-        delay(250);
-      } 
-    }
-    else if (getValuesFromKey(responseString, "type") == "WRN") // Severe Thunderstorm Warning
-    {
-      Serial.println("Severe Thunderstorm Warning");
-      for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
-      {
-        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
-        pixels.setPixelColor(0, pixels.Color(255,95,0)); // ORANGE
-        pixels.show(); // This sends the updated pixel color to the hardware.
-        delay(250);
-        pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
-        pixels.setPixelColor(0, pixels.Color(255,255,0)); // YELLOW
-        pixels.show(); // This sends the updated pixel color to the hardware.
-        delay(250);
+       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
+       pixels.setPixelColor(0, pixels.Color(255,0,0));   // RED
+       pixels.show(); // This sends the updated pixel color to the hardware.
+       delay(250);
+       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+       pixels.setPixelColor(0, pixels.Color(255,95,0)); // ORANGE
+       pixels.show(); // This sends the updated pixel color to the hardware.
+       delay(250);
+     } 
+  }
+  else if (type == "TOW") // Tornado Watch
+  {
+   Serial.println("Tornado Watch");
+   for(int x = 0; x < 150; x++) // Neopixel LED blinks 150 times. 
+     {
+       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
+       pixels.setPixelColor(0, pixels.Color(255,0,0));   // RED
+       pixels.show(); // This sends the updated pixel color to the hardware.
+       delay(250);
+       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+       pixels.setPixelColor(0, pixels.Color(255,255,0)); // YELLOW
+       pixels.show(); // This sends the updated pixel color to the hardware.
+       delay(250);
+     } 
+  }
+  else if (type == "WRN") // Severe Thunderstorm Warning
+  {
+     Serial.println("Severe Thunderstorm Warning");
+     for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
+     {
+       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+       pixels.setPixelColor(0, pixels.Color(255,95,0)); // ORANGE
+       pixels.show(); // This sends the updated pixel color to the hardware.
+       delay(250);
+       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+       pixels.setPixelColor(0, pixels.Color(255,255,0)); // YELLOW
+       pixels.show(); // This sends the updated pixel color to the hardware.
+       delay(250);
       } 
     }    
-    else if (getValuesFromKey(responseString, "type") == "WIN") // Winter Weather
+    else if (type == "WIN") // Winter Weather
     {
       Serial.println("Winter Weather");
       for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
@@ -424,61 +467,6 @@ WiFiClient client;
       Serial.println("No Reportable Weather Alerts");
     }
   }
-  
-}
-
-String getValuesFromKey(const String response, const String sKey)
-{ 
-  String sKey_ = sKey;
-  
-  sKey_ = "\"" + sKey + "\":";
-  
-  char key[sKey_.length()];
-  
-  sKey_.toCharArray(key, sizeof(key));
-  
-  int keySize = sizeof(key)-1;
-    
-  String result = "";  // String result = NULL;
-  
-  int n = response.length();
-  
-  for(int i=0; i < (n-keySize-1); i++)
-  {
-    char c[keySize];
-    
-    for(int k=0; k<keySize; k++)
-    {
-      c[k] = response.charAt(i+k);
-    }
-        
-    boolean isEqual = true;
-    
-    for(int k=0; k<keySize; k++)
-    {
-      if(!(c[k] == key[k]))
-      {
-        isEqual = false;
-        break;
-      }
-    }
-    
-    if(isEqual)
-    {     
-      int j= i + keySize + 1;
-      while(!(response.charAt(j) == ','))
-      {
-        result += response.charAt(j);        
-        j++;
-      }
-      
-      //Remove char '"'
-      result.replace("\"","");
-      break;
-    }
-  }
-  
-  return result;
 }
 
 void dash()
