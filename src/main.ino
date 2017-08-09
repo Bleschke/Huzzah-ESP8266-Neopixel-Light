@@ -1,6 +1,6 @@
 /* 
  * Brian Leschke
- * May 16, 2017
+ * August 8, 2017
  * Adafruit Huzzah ESP 8266 Neopixel Light
  * The ESP8266 will control a neopixel and change the color based on Weather events, Holidays, and Fire/EMS calls.
  * Version 1.4
