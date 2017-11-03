@@ -1,6 +1,6 @@
 /* 
  * Brian Leschke
- * August 8, 2017
+ * November 3, 2017
  * Adafruit Huzzah ESP 8266 Neopixel Light
  * The ESP8266 will control a neopixel and change the color based on Weather events, Holidays, and Fire/EMS calls.
  * Version 1.4
@@ -16,6 +16,7 @@
  * 2/28/17 - Added Date Events (Holidays)
  * 5/16/17 - Removed platformio support and OTA by platformio. Arduino software will only be used for updating. 
  * 8/8/17  - Modified weather alert parsing code
+ * 11/3/17 - Fixed bugs
  *
  * 
 */
@@ -83,7 +84,7 @@ unsigned long WMillis   = 0;  // temporary millis() register
 
 
 // ** FIRE-EMS INFORMATION **
-char SERVER_NAME[]    = "SERVER_ADDRESS"; // Address of the webserver
+char SERVER_NAME[]    = "SERVER_ADDRESS";  // Address of the webserver
 int SERVER_PORT       = SERVER_PORT;       // webserver port
 
 char Str[11];
@@ -172,7 +173,7 @@ void setup()
   pinMode(txPin, OUTPUT) ; // Initialize Morse Code transmission output.
   
   delay(100);
-	
+  
   WiFi.begin(ssid, password);
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
     Serial.println("Connection Failed! Rebooting...");
@@ -320,10 +321,10 @@ WiFiClient client;
     if (!client.connect(WxServer, 80))
     {
       Serial.println("Connection Failed: Wunderground");
-      return
+      return;
     }
     
-  String cmd = "GET /api/" + myKey + "/" + myWxAlertFeatures + "/q/" + myState + "/" + myCity + ".json HTTP/1.1; // build request_string cmd
+  String cmd = "GET /api/" + myKey + "/" + myWxAlertFeatures + "/q/" + myState + "/" + myCity + ".json HTTP/1.1"; // build request_string cmd
   cmd += " HTTP/1.1\r\nHost: api.wunderground.com\r\n\r\n"; 
   delay(500);
   client.print(cmd);                                            
@@ -385,8 +386,7 @@ void parseJSON(char json[300])
  
  if (!root.success())
 {
-  lcd.setCursor(0,3);
-  lcd.print("?fparseObject() failed");
+
   //return;
 }
 
@@ -400,7 +400,7 @@ void parseJSON(char json[300])
  Serial.println(description);
  Serial.println(date);
  Serial.println(expires);
-	
+  
  if (type == "TOR") // Tornado Warning
  {
   Serial.println("Tornado Warning");
@@ -467,7 +467,6 @@ void parseJSON(char json[300])
       Serial.println("No Reportable Weather Alerts");
     }
   }
-}
 
 void dash()
 {
@@ -571,42 +570,35 @@ void timeDateEvents()
 
       if (stricmp ("01-01",buffer) == 0)
       {
-	Serial.println("Happy New Year!");
-  	colorWipe(pixels.Color(255, 0, 0), 50); // Red
-  	colorWipe(pixels.Color(0, 255, 0), 50); // Green
-  	colorWipe(pixels.Color(0, 0, 255), 50); // Blue
-  	rainbow(20);
-  	rainbowCycle(20);
+  Serial.println("Happy New Year!");
+    rainbowCycle(20);
       }
       else if (stricmp ("07-04",buffer) == 0)
       {
-	Serial.println("Happy 4th of July!");
-  	colorWipe(pixels.Color(255, 0, 0), 50);     // Red
-  	colorWipe(pixels.Color(255, 255, 255), 50); // White
-  	colorWipe(pixels.Color(0, 0, 255), 50);     // Blue
-  	rainbow(20);
-  	rainbowCycle(20);
+  Serial.println("Happy 4th of July!");
+    colorWipe(pixels.Color(255, 0, 0), 50);     // Red
+    colorWipe(pixels.Color(255, 255, 255), 50); // White
+    colorWipe(pixels.Color(0, 0, 255), 50);     // Blue
       }
       else if (stricmp ("10-11",buffer) == 0)
       {
-	Serial.println("Happy National Coming Out Day!");
-  	colorWipe(pixels.Color(255, 0, 0), 50); // Red
-  	colorWipe(pixels.Color(0, 255, 0), 50); // Green
-  	colorWipe(pixels.Color(0, 0, 255), 50); // Blue
-  	rainbow(20);
-  	rainbowCycle(20);
+  Serial.println("Happy National Coming Out Day!");
+    rainbowCycle(20);
+      }
+      else if (stricmp ("10-31",buffer) == 0)
+      {
+  Serial.println("Happy Halloween!");
+    colorWipe(pixels.Color(255, 139, 0), 50);     // Orange
       }
       else if (stricmp ("12-25",buffer) == 0)
       {
-	Serial.println("Merry Christmas!");
-  	colorWipe(pixels.Color(255, 0, 0), 50); // Red
-  	colorWipe(pixels.Color(0, 255, 0), 50); // Green
-  	rainbow(20);
-  	rainbowCycle(20);
+  Serial.println("Merry Christmas!");
+    colorWipe(pixels.Color(255, 0, 0), 50); // Red
+    colorWipe(pixels.Color(0, 255, 0), 50); // Green
       }
       else
       {
-	Serial.print("No date events for: ");
+  Serial.print("No date events for: ");
         Serial.print(buffer);
         Serial.println("");
         pixels.setPixelColor(0, pixels.Color(0,0,0)); // OFF
