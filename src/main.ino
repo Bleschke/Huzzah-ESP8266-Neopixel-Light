@@ -1,22 +1,20 @@
 /* 
  * Brian Leschke
- * November 3, 2017
+ * November 4, 2017
  * Adafruit Huzzah ESP 8266 Neopixel Light
  * The ESP8266 will control a neopixel and change the color based on Weather events, Holidays, and Fire/EMS calls.
- * Version 1.4
+ * Version 1.5
  * 
- *
- * -- Credit and Recognition: --
- * Morse Code Beacon Code by Mark VandeWettering (k6hx@arrl.net)
  *
  * -- Changelog: -- 
  * 
  * 2/26/17 - Initial Release - Fire/EMS and Weather Alerts implemented
- * 2/27/17 - Added NTP Client and Morse Code
+ * 2/27/17 - Added NTP Client
  * 2/28/17 - Added Date Events (Holidays)
  * 5/16/17 - Removed platformio support and OTA by platformio. Arduino software will only be used for updating. 
  * 8/8/17  - Modified weather alert parsing code
  * 11/3/17 - Fixed bugs
+ * 11/4/17 - Fixed bugs
  *
  * 
 */
@@ -31,6 +29,7 @@
 #include <ArduinoOTA.h>
 #include <ArduinoJson.h>
 #include <SPI.h>
+#include <stdlib.h>
 
 #include <Adafruit_NeoPixel.h>
 #ifdef __AVR__
@@ -41,9 +40,9 @@
 // -------------------- CONFIGURATION --------------------
 
 // ** mDNS and OTA Constants **
-#define HOSTNAME "ESP8266-OTA-"     // Hostename. The setup function adds the Chip ID at the end.
 #define PIN            0            // Pin used for Neopixel communication
 #define NUMPIXELS      1            // Number of Neopixels connected to Arduino
+
 // Neopixel Setup
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
@@ -84,7 +83,7 @@ unsigned long WMillis   = 0;  // temporary millis() register
 
 
 // ** FIRE-EMS INFORMATION **
-char SERVER_NAME[]    = "SERVER_ADDRESS";  // Address of the webserver
+char SERVER_NAME[]    = "SERVER_ADDRESS"; // Address of the webserver
 int SERVER_PORT       = SERVER_PORT;       // webserver port
 
 char Str[11];
@@ -98,61 +97,9 @@ const char* timeHost    = "129.6.15.30";
 const int timePort      = 13;
 
 int ln = 0;
-String TimeDate = "";
+String Date     = "";
+String Time     = "";
 
-
-// ** MORSE CODE TRANSMISSION INFORMATION **
-#define N_MORSE  (sizeof(morsetab)/sizeof(morsetab[0]))
-
-#define SPEED  (12)
-#define DOTLEN  (1200/SPEED)
-#define DASHLEN  (3*(1200/SPEED))
-int txPin = 5;
-
-struct t_mtab { char c, pat; } ;
-
-struct t_mtab morsetab[] = {
-  {'.', 106},
-  {',', 115},
-  {'?', 76},
-  {'/', 41},
-  {'A', 6},
-  {'B', 17},
-  {'C', 21},
-  {'D', 9},
-  {'E', 2},
-  {'F', 20},
-  {'G', 11},
-  {'H', 16},
-  {'I', 4},
-  {'J', 30},
-  {'K', 13},
-  {'L', 18},
-  {'M', 7},
-  {'N', 5},
-  {'O', 15},
-  {'P', 22},
-  {'Q', 27},
-  {'R', 10},
-  {'S', 8},
-  {'T', 3},
-  {'U', 12},
-  {'V', 24},
-  {'W', 14},
-  {'X', 25},
-  {'Y', 29},
-  {'Z', 19},
-  {'1', 62},
-  {'2', 60},
-  {'3', 56},
-  {'4', 48},
-  {'5', 32},
-  {'6', 33},
-  {'7', 35},
-  {'8', 39},
-  {'9', 47},
-  {'0', 63}
-} ;
 
 // Uncomment the next line for verbose output over UART.
 #define SERIAL_VERBOSE
@@ -161,16 +108,14 @@ struct t_mtab morsetab[] = {
 // ---------- OTA CONFIGURATION - DO NOT MODIFY ----------
 
 void setup()
-{
-  pixels.setPixelColor(0, pixels.Color(0,0,0)); // OFF
-  pixels.show(); // This sends the updated pixel color to the hardware.
-  
-  String station_ssid = ""; // Do Not Change
-  String station_psk = "";  // Do Not Change
-
+{  
   Serial.begin(115200);
   pixels.begin(); // This initializes the NeoPixel library.
-  pinMode(txPin, OUTPUT) ; // Initialize Morse Code transmission output.
+  Serial.println("Booting...");
+  //rainbowCycle(5);
+
+  pixels.setPixelColor(0, pixels.Color(0,150,128)); // bluish green
+  pixels.show(); // This sends the updated pixel color to the hardware.
   
   delay(100);
   
@@ -236,13 +181,15 @@ void setup()
 
 void FireEmsCheck() {
   yield();
+  pixels.setPixelColor(0, pixels.Color(100,100,100)); // WHITE
+  pixels.show(); // This sends the updated pixel color to the hardware.
+  
   WiFiClient client;
   if (client.connect(SERVER_NAME, SERVER_PORT)) {
     Serial.println("Fire/EMS email check: connected");
     // Make a HTTP request:
     client.println("GET /GetGmail.php");  // Apache server pathway.
     client.println();
-    int timer = millis();
     delay(2000);
   } 
   else {
@@ -306,22 +253,24 @@ void FireEmsCheck() {
   else  //if email value is lower/equal to previous, no alert.
   {
     Serial.println("No New Alert Emails");
-    pixels.setPixelColor(0, pixels.Color(0,0,0)); // OFF
-    pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
-    pixels.show(); // This sends the updated pixel color to the hardware.
   }
   delay(2000);
+  pixels.setPixelColor(0, pixels.Color(100,100,100)); // WHITE
+  pixels.show(); // This sends the updated pixel color to the hardware.
 }
 
 void WeatherAlerts() {
-yield();
-// Use WiFiClient class to create TCP connections
-WiFiClient client;
-    //***** if you get a connection, report back via serial:
-    if (!client.connect(WxServer, 80))
-    {
-      Serial.println("Connection Failed: Wunderground");
-      return;
+  yield();
+  
+  int timer = millis();
+  // Use WiFiClient class to create TCP connections
+  WiFiClient client;
+  
+  //***** if you get a connection, report back via serial:
+  if (!client.connect(WxServer, 80))
+  {
+    Serial.println("Connection Failed: Wunderground");
+    return;
     }
     
   String cmd = "GET /api/" + myKey + "/" + myWxAlertFeatures + "/q/" + myState + "/" + myCity + ".json HTTP/1.1"; // build request_string cmd
@@ -338,8 +287,6 @@ WiFiClient client;
     boolean quote = false; int nn = false;                      // if quote=fals means no quotes so comma means break
     while (!client.find(weatherConds[j]))                         // If metro condition data is not available, try again.
     {
-      pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
-      pixels.show(); // This sends the updated pixel color to the hardware.
       Serial.println("No data available");
       return;
     }                            
@@ -400,129 +347,77 @@ void parseJSON(char json[300])
  Serial.println(description);
  Serial.println(date);
  Serial.println(expires);
-  
+
+ // ---------------- WEATHER ALERTS: ALERT FOR HAZARDOUS CONDITIONS ---------------- 
+
  if (type == "TOR") // Tornado Warning
  {
   Serial.println("Tornado Warning");
   for(int x = 0; x < 200; x++)  // Neopixel LED blinks 200 times.
     {
-       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
-       pixels.setPixelColor(0, pixels.Color(255,0,0));   // RED
-       pixels.show(); // This sends the updated pixel color to the hardware.
-       delay(250);
-       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
-       pixels.setPixelColor(0, pixels.Color(255,95,0)); // ORANGE
-       pixels.show(); // This sends the updated pixel color to the hardware.
-       delay(250);
-     } 
-  }
+      pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
+      pixels.setPixelColor(0, pixels.Color(255,0,0));   // RED
+      pixels.show(); // This sends the updated pixel color to the hardware.
+      delay(250);
+      pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+      pixels.setPixelColor(0, pixels.Color(255,95,0)); // ORANGE
+      pixels.show(); // This sends the updated pixel color to the hardware.
+      delay(250);
+    }
+ }
   else if (type == "TOW") // Tornado Watch
   {
    Serial.println("Tornado Watch");
    for(int x = 0; x < 150; x++) // Neopixel LED blinks 150 times. 
      {
-       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
-       pixels.setPixelColor(0, pixels.Color(255,0,0));   // RED
-       pixels.show(); // This sends the updated pixel color to the hardware.
-       delay(250);
-       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
-       pixels.setPixelColor(0, pixels.Color(255,255,0)); // YELLOW
-       pixels.show(); // This sends the updated pixel color to the hardware.
-       delay(250);
-     } 
+      pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF  
+      pixels.setPixelColor(0, pixels.Color(255,0,0));   // RED
+      pixels.show(); // This sends the updated pixel color to the hardware.
+      delay(250);
+      pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+      pixels.setPixelColor(0, pixels.Color(255,255,0)); // YELLOW
+      pixels.show(); // This sends the updated pixel color to the hardware.
+      delay(250);
+     }
   }
   else if (type == "WRN") // Severe Thunderstorm Warning
   {
      Serial.println("Severe Thunderstorm Warning");
      for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
      {
-       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
-       pixels.setPixelColor(0, pixels.Color(255,95,0)); // ORANGE
-       pixels.show(); // This sends the updated pixel color to the hardware.
-       delay(250);
-       pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
-       pixels.setPixelColor(0, pixels.Color(255,255,0)); // YELLOW
-       pixels.show(); // This sends the updated pixel color to the hardware.
-       delay(250);
-      } 
-    }    
+      pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+      pixels.setPixelColor(0, pixels.Color(255,95,0)); // ORANGE
+      pixels.show(); // This sends the updated pixel color to the hardware.
+      delay(250);
+      pixels.setPixelColor(0, pixels.Color(0,0,0));     // OFF
+      pixels.setPixelColor(0, pixels.Color(255,255,0)); // YELLOW
+      pixels.show(); // This sends the updated pixel color to the hardware.
+      delay(250);
+     }
+  }    
     else if (type == "WIN") // Winter Weather
     {
       Serial.println("Winter Weather");
       for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
       {
-        pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF  
-        pixels.setPixelColor(0, pixels.Color(255,162,178)); // Pink
-        pixels.show(); // This sends the updated pixel color to the hardware.
-        delay(250);
-        pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF
-        pixels.setPixelColor(0, pixels.Color(0,249,255));   // Light Blue
-        pixels.show(); // This sends the updated pixel color to the hardware.
-        delay(250);
-      } 
+       pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF  
+       pixels.setPixelColor(0, pixels.Color(255,162,178)); // Pink
+       pixels.show(); // This sends the updated pixel color to the hardware.
+       delay(250);
+       pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF
+       pixels.setPixelColor(0, pixels.Color(0,249,255));   // Light Blue
+       pixels.show(); // This sends the updated pixel color to the hardware.
+       delay(250);
+      }
     }
     else {
-      pixels.setPixelColor(0, pixels.Color(255,255,255)); // DEFAULT WHITE
-      pixels.show(); // This sends the updated pixel color to the hardware.
       Serial.println("No Reportable Weather Alerts");
     }
-  }
-
-void dash()
-{
-  digitalWrite(txPin, HIGH) ;
-  delay(DASHLEN);
-  digitalWrite(txPin, LOW) ;
-  delay(DOTLEN) ;
 }
 
-void dit()
-{
-  digitalWrite(txPin, HIGH) ;
-  delay(DOTLEN);
-  digitalWrite(txPin, LOW) ;
-  delay(DOTLEN);
-}
+// ---------------- DATE EVENTS ---------------- 
 
-void send(char c)
-{
-  yield();
-  int i ;
-  if (c == ' ') {
-    Serial.print(c) ;
-    delay(7*DOTLEN) ;
-    return ;
-  }
-  for (i=0; i<N_MORSE; i++) {
-    if (morsetab[i].c == c) {
-      unsigned char p = morsetab[i].pat ;
-      Serial.print(morsetab[i].c) ;
-
-      while (p != 1) {
-          if (p & 1)
-            dash() ;
-          else
-            dit() ;
-          p = p / 2 ;
-      }
-      delay(2*DOTLEN) ;
-      return ;
-    }
-  }
-  /* if we drop off the end, then we send a space */
-  Serial.print("?") ;
-}
-
-void sendmsg(char *str)
-{
-  yield();
-  while (*str)
-    send(*str++) ;
-  Serial.println("");
-}
-
-
-void timeDateEvents()
+void DateEvents()
 {
   yield();
   Serial.print("connecting to ");
@@ -556,66 +451,102 @@ void timeDateEvents()
     {
       // Serial.print(line);
       // date starts at pos 10. We don't need the year.
-      TimeDate = line.substring(10);
+      Date = line.substring(10);
       Serial.println("UTC Time and Date:");
-      Serial.println(TimeDate);
+      Serial.println(Date);
       // time starts at pos 14
-      TimeDate = line.substring(10, 15);
-      TimeDate.toCharArray(buffer, 10);
+      Date = line.substring(10, 15);
+      Date.toCharArray(buffer, 10);
       Serial.println("UTC Date:");    // MM-DD
       Serial.println(buffer);
-      //TimeDate = line.substring(16, 24);
+      //TimeDate = line.substring(16, 17);
       //TimeDate.toCharArray(buffer, 10);
       //Serial.println(buffer);
 
+     // ---------------- DATE EVENTS: ALERT FOR HOLIDAYS ---------------- 
+
       if (stricmp ("01-01",buffer) == 0)
       {
-  Serial.println("Happy New Year!");
-    rainbowCycle(20);
+        Serial.println("Happy New Year!");
+        rainbowCycle(20);
       }
       else if (stricmp ("07-04",buffer) == 0)
       {
-  Serial.println("Happy 4th of July!");
-    colorWipe(pixels.Color(255, 0, 0), 50);     // Red
-    colorWipe(pixels.Color(255, 255, 255), 50); // White
-    colorWipe(pixels.Color(0, 0, 255), 50);     // Blue
+        Serial.println("Happy 4th of July!");
+        for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
+        {
+          pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF  
+          pixels.setPixelColor(0, pixels.Color(255,0,0));     // Red
+          pixels.show(); // This sends the updated pixel color to the hardware.
+          delay(250);
+          pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF
+          pixels.setPixelColor(0, pixels.Color(255,255,255)); // White
+          pixels.show(); // This sends the updated pixel color to the hardware.
+          delay(250);
+          pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF
+          pixels.setPixelColor(0, pixels.Color(0,0,255));     // Blue
+          pixels.show(); // This sends the updated pixel color to the hardware.
+          delay(250);
+          }
       }
       else if (stricmp ("10-11",buffer) == 0)
       {
-  Serial.println("Happy National Coming Out Day!");
-    rainbowCycle(20);
+        Serial.println("Happy National Coming Out Day!");
+        rainbowCycle(20);
       }
       else if (stricmp ("10-31",buffer) == 0)
       {
-  Serial.println("Happy Halloween!");
-    colorWipe(pixels.Color(255, 139, 0), 50);     // Orange
+        Serial.println("Happy Halloween!");
+        pixels.setPixelColor(0, pixels.Color(255,95,0)); // Orange
+        pixels.show(); // This sends the updated pixel color to the hardware.
       }
       else if (stricmp ("12-25",buffer) == 0)
       {
-  Serial.println("Merry Christmas!");
-    colorWipe(pixels.Color(255, 0, 0), 50); // Red
-    colorWipe(pixels.Color(0, 255, 0), 50); // Green
+        Serial.println("Merry Christmas!");
+        for(int x = 0; x < 150; x++)  // Neopixel LED blinks 150 times.
+        {
+          pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF  
+          pixels.setPixelColor(0, pixels.Color(255,0,0));     // Red
+          pixels.show(); // This sends the updated pixel color to the hardware.
+          delay(250);
+          pixels.setPixelColor(0, pixels.Color(0,0,0));       // OFF
+          pixels.setPixelColor(0, pixels.Color(0,255,0));     // Green
+          pixels.show(); // This sends the updated pixel color to the hardware.
+          delay(250);
+          }
       }
       else
       {
-  Serial.print("No date events for: ");
+        Serial.print("No date events for: ");
         Serial.print(buffer);
         Serial.println("");
-        pixels.setPixelColor(0, pixels.Color(0,0,0)); // OFF
-        pixels.setPixelColor(0, pixels.Color(255,255,255)); // WHITE
+        pixels.setPixelColor(0, pixels.Color(100,100,100)); // WHITE
         pixels.show(); // This sends the updated pixel color to the hardware.
       }
-
     }
   }
 }
 
-// Fill the dots one after the other with a color
-void colorWipe(uint32_t c, uint8_t wait) {
-  for(uint16_t i=0; i<pixels.numPixels(); i++) {
-      pixels.setPixelColor(i, c);
-      pixels.show();
-      delay(wait);
+
+void WeatherAlertCheck()
+{
+  yield();
+  unsigned long currentWxAlertMillis = millis();
+  
+  if(currentWxAlertMillis - previousWxAlertMillis >= wxAlertCheckInterval) {
+    Serial.println("Checking for Weather Alerts");
+    WeatherAlerts();
+    previousWxAlertMillis = currentWxAlertMillis; //remember the time(millis)
+  }
+  else {
+    Serial.println("Bypassing Weather Alert Check. Less than 15 minutes since last check.");
+    Serial.println("Previous Millis: ");
+    Serial.println(previousWxAlertMillis);
+    Serial.println("Current Millis: ");
+    Serial.println(currentWxAlertMillis);
+    Serial.println("Subtracted Millis");
+    Serial.println(currentWxAlertMillis-previousWxAlertMillis);
+    Serial.println();
   }
 }
  
@@ -664,39 +595,18 @@ void loop()
 {
   // Handle OTA server.
   ArduinoOTA.handle();
-  yield();
-  
 
-  // ---------- USER CODE GOES HERE ----------
-
-  // ** Transmit Morse Code **
-  sendmsg("CALLSIGN"); // FCC callsign and Message
- 
+  // ---------- USER CODE GOES HERE ---------- 
 
   // ** FireEMS Alert Check **
   FireEmsCheck();
 
   // ** Receive Time (NTP) and run events**
-  timeDateEvents();  //20 is the amount of speed delay for color changing
+  DateEvents();  //20 is the amount of speed delay for color changing
 
   // ** Weather Alert Check **
-  unsigned long currentWxAlertMillis = millis();
-  
-  if(currentWxAlertMillis - previousWxAlertMillis >= wxAlertCheckInterval) {
-    Serial.println("Checking for Weather Alerts");
-    WeatherAlerts();
-    previousWxAlertMillis = currentWxAlertMillis; //remember the time(millis)
-  }
-  else {
-    Serial.println("Bypassing Weather Alert Check. Less than 15 minutes since last check.");
-    Serial.println("Previous Millis: ");
-    Serial.println(previousWxAlertMillis);
-    Serial.println("Current Millis: ");
-    Serial.println(currentWxAlertMillis);
-    Serial.println("Subtracted Millis");
-    Serial.println(currentWxAlertMillis-previousWxAlertMillis);
-    Serial.println();
-  }
+  WeatherAlertCheck();
   
   // ---------- USER CODE GOES HERE ----------
+  yield();
 }
