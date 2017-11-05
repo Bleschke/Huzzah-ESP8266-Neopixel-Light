@@ -12,7 +12,6 @@ Currently Implemented:
     * Tornado Watch
     * Severe Thunderstorm Warning
     * Winter Weather
-* Morse Code transmission from 433 Mhz chip
 * Lights change color for Holidays
 
 ### **Prerequisities**
@@ -23,7 +22,6 @@ You will need:
 2. Flora Neopixel (http://adafru.it/1312)
 3. Arduino Programming software
 4. FTDI cable (https://www.sparkfun.com/products/9717)
-5. Radio Transmitter (https://www.sparkfun.com/products/10534)
 
 ### **Usage**
 
